@@ -1,7 +1,8 @@
 import json
+import pygame
 import numpy as np
 import perlin_noise
-from entity import Entity
+from entity import Entity, PNJ
 
 # Charger la configuration depuis un fichier JSON
 def load_config(file_path):
@@ -71,14 +72,25 @@ class World:
         self.noise_generator = PerlinNoiseGenerator(config)
         self.loaded_chunks = {}  # Dictionnaire stockant les chunks chargés
         self.config = config
+        self.pnj_list = []  # Liste des PNJ dans le monde
     
+    def add_pnj(self, pnj):
+        """Ajoute un PNJ au monde."""
+        self.pnj_list.append(pnj)
+    
+    def update_pnj(self, delta_time):
+        """Met à jour les PNJ dans le monde."""
+        for pnj in self.pnj_list:
+            pnj.move(delta_time)
+            pnj.interact_with_other_pnj(self.pnj_list)
+
     def get_chunk(self, chunk_x, chunk_y):
         """Retourne un chunk, le génère si nécessaire."""
         if (chunk_x, chunk_y) not in self.loaded_chunks:
             # Générer et stocker le chunk s'il n'existe pas encore
             self.loaded_chunks[(chunk_x, chunk_y)] = Chunk(chunk_x * self.config['chunk_size'], chunk_y * self.config['chunk_size'], self.noise_generator, self.config)
         return self.loaded_chunks[(chunk_x, chunk_y)]
-    
+
     def load_chunks_around_camera(self, camera_x, camera_y):
         """Charge les chunks autour de la position de la caméra."""
         chunk_x = camera_x // self.config['chunk_size']
@@ -93,8 +105,10 @@ class Camera:
         self.world = world
         self.x = start_x
         self.y = start_y
-        self.config = config
-        self.update_chunks()
+        self.screen_width = config['screen_width']
+        self.screen_height = config['screen_height']
+        self.scale = config['scale']  # Échelle de conversion mètres -> pixels (par ex. 1 mètre = 32 pixels)
+        self.screen = pygame.display.set_mode((self.screen_width, self.screen_height))
     
     def move(self, dx, dy):
         """Déplace la caméra et met à jour les chunks visibles."""
@@ -107,36 +121,78 @@ class Camera:
         self.world.load_chunks_around_camera(self.x, self.y)
     
     def render(self):
-        """Affiche les chunks visibles autour de la caméra."""
-        chunk_x = self.x // self.config['chunk_size']
-        chunk_y = self.y // self.config['chunk_size']
-        for cx in range(chunk_x - self.config['view_distance'], chunk_x + self.config['view_distance'] + 1):
-            for cy in range(chunk_y - self.config['view_distance'], chunk_y + self.config['view_distance'] + 1):
-                chunk = self.world.get_chunk(cx, cy)
-                print(f"Chunk ({cx}, {cy}):")
-                print(chunk.tiles)
-                print("")
+        """Affiche le monde et les PNJ sur l'écran."""
+        self.screen.fill((135, 206, 235))  # Couleur de fond (bleu ciel)
 
-# Exemple d'utilisation
+        # Afficher les chunks
+        chunk_x = self.x // self.world.config['chunk_size']
+        chunk_y = self.y // self.world.config['chunk_size']
+        for cx in range(chunk_x - self.world.config['view_distance'], chunk_x + self.world.config['view_distance'] + 1):
+            for cy in range(chunk_y - self.world.config['view_distance'], chunk_y + self.world.config['view_distance'] + 1):
+                chunk = self.world.get_chunk(cx, cy)
+                self.render_chunk(chunk)
+
+        # Afficher les PNJ
+        for pnj in self.world.pnj_list:
+            pnj.render(self.screen, self.scale)
+
+        # Mettre à jour l'affichage
+        pygame.display.flip()
+
+    def render_chunk(self, chunk):
+        """Affiche un chunk à l'écran."""
+        for x in range(chunk.chunk_size):
+            for y in range(chunk.chunk_size):
+                tile_type = chunk.tiles[x][y]
+                screen_x = int((chunk.x_offset + x) * self.scale)
+                screen_y = int((chunk.y_offset + y) * self.scale)
+                
+                # Dessiner les tuiles en fonction du type de terrain
+                if tile_type == 'Plains':
+                    color = (34, 139, 34)  # Vert pour les plaines
+                elif tile_type == 'Mountains':
+                    color = (139, 137, 137)  # Gris pour les montagnes
+                else:
+                    color = (0, 100, 0)  # Vert foncé pour d'autres biomes
+
+                pygame.draw.rect(self.screen, color, pygame.Rect(screen_x, screen_y, self.scale, self.scale))
+
 def main():
-    # Charger la configuration depuis un fichier JSON
+    # Charger la configuration
     config = load_config('config.json')
     
-    # Créer le monde avec la configuration
+    # Initialiser Pygame
+    pygame.init()
+
+    # Créer le monde et la caméra
     world = World(config)
-    
-    # Créer la caméra avec la configuration
-    camera = Camera(world, config, start_x=0, start_y=0)
-    pnj = Entity(0, 0, world, config)
-    
-    # Déplacer la caméra pour charger des nouveaux chunks
-    camera.render()  # Afficher la zone initiale
-    camera.move(16, 0)  # Déplacer la caméra vers la droite
-    camera.render()  # Afficher les nouveaux chunks
-    
-    for i in range(10):
-        pnj.move(i)
-        print(pnj.x, pnj.y)
+    camera = Camera(world, config)
+
+    # Ajouter des PNJ avec des tailles variables
+    pnj1 = PNJ(10, 10, world, config, size=1.6)  # 1.6 mètres
+    pnj2 = PNJ(12, 10, world, config, size=1.8)  # 1.8 mètres
+    world.add_pnj(pnj1)
+    world.add_pnj(pnj2)
+
+    # Boucle principale de simulation
+    clock = pygame.time.Clock()
+    running = True
+    while running:
+        delta_time = clock.tick(60) / 1000.0  # 60 FPS, delta_time en secondes
+
+        # Mise à jour des PNJ
+        world.update_pnj(delta_time)
+
+        # Rendu de la caméra
+        camera.render()
+
+        # Gérer les événements (fermeture de la fenêtre, etc.)
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
+                running = False
+
+    pygame.quit()
 
 if __name__ == "__main__":
     main()
+

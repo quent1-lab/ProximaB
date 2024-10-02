@@ -1,3 +1,6 @@
+import random
+import pygame
+
 class Entity:
     """Classe représentant une entité physique avec des règles de physique."""
     def __init__(self, x, y, world, config):
@@ -56,3 +59,64 @@ class Entity:
             if chunk.tiles[local_x][local_y] in ['Mountains', 'Solid']:
                 return local_y
         return y  # Si aucune collision détectée, on ne change pas la position Y
+
+class PNJ(Entity):
+    """Classe représentant un PNJ avec des interactions et des règles de physique."""
+    def __init__(self, x, y, world, config, size=1.75):
+        super().__init__(x, y, world, config)
+        self.interaction_radius = 5  # Rayon d'interaction entre les PNJ
+        self.friction_coefficient = 0.1  # Coefficient de frottement (ex: surface glissante ou rugueuse)
+        self.bounce_factor = 0.5  # Facteur de rebond (1 = rebond parfait, 0 = aucun rebond)
+        self.size = size  # Taille du PNJ en mètres (par exemple, 1.75 m)
+
+    def apply_friction(self):
+        """Applique les frottements pour ralentir le PNJ."""
+        if self.on_ground:
+            self.vx *= (1 - self.friction_coefficient)
+            self.vy *= (1 - self.friction_coefficient)
+
+    def interact_with_other_pnj(self, pnj_list):
+        """Interagit avec d'autres PNJ dans le rayon d'interaction."""
+        for other_pnj in pnj_list:
+            if other_pnj != self:
+                distance = self.get_distance(other_pnj)
+                if distance < self.interaction_radius:
+                    self.avoid_collision(other_pnj)
+                    # Exemples d'autres interactions : se suivre, échanger des infos, etc.
+    
+    def get_distance(self, other_pnj):
+        """Calcule la distance entre deux PNJ."""
+        return ((self.x - other_pnj.x)**2 + (self.y - other_pnj.y)**2)**0.5
+
+    def avoid_collision(self, other_pnj):
+        """Évite les collisions avec un autre PNJ en ajustant la vitesse."""
+        dx = self.x - other_pnj.x
+        dy = self.y - other_pnj.y
+        distance = self.get_distance(other_pnj)
+        if distance > 0:
+            # Ajuster la vitesse pour éviter la collision
+            self.vx += dx / distance * 0.1
+            self.vy += dy / distance * 0.1
+
+    def handle_collision(self, delta_time):
+        """Gère les collisions avec le terrain ou les PNJ."""
+        if self.collides_with_ground(self.x, self.y):
+            self.vy = -self.vy * self.bounce_factor  # Rebond vertical
+            self.on_ground = True
+        else:
+            self.on_ground = False
+        
+        # Déplacement en tenant compte des frottements et des collisions
+        self.apply_friction()
+        self.move(delta_time)
+    
+    def render(self, screen, scale):
+        """Affiche graphiquement le PNJ sur l'écran."""
+        # Convertir la position en pixels en fonction de l'échelle
+        screen_x = int(self.x * scale)
+        screen_y = int(self.y * scale)
+        size_in_pixels = int(self.size * scale)
+        
+        # Dessiner le PNJ comme un rectangle pour simplifier
+        pygame.draw.rect(screen, (0, 255, 0), pygame.Rect(screen_x, screen_y - size_in_pixels, size_in_pixels//2, size_in_pixels))
+

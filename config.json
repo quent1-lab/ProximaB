@@ -1,31 +1,33 @@
 {
-    "perlin": {
-      "seed": 42,
-      "octaves": 4
+  "perlin": {
+    "seed": 4266642,
+    "octaves": 4
+  },
+  "biomes": [
+    {
+      "name": "Water",
+      "min_noise_value": -1.0,
+      "max_noise_value": -0.3
     },
-    "biomes": [
-      {
-        "name": "Water",
-        "min_noise_value": -1.0,
-        "max_noise_value": -0.3
-      },
-      {
-        "name": "Beach",
-        "min_noise_value": -0.3,
-        "max_noise_value": -0.1
-      },
-      {
-        "name": "Plains",
-        "min_noise_value": -0.1,
-        "max_noise_value": 0.4
-      },
-      {
-        "name": "Mountains",
-        "min_noise_value": 0.4,
-        "max_noise_value": 1.0
-      }
-    ],
-    "chunk_size": 16,
-    "view_distance": 2
-  }
-  
+    {
+      "name": "Beach",
+      "min_noise_value": -0.3,
+      "max_noise_value": -0.1
+    },
+    {
+      "name": "Plains",
+      "min_noise_value": -0.1,
+      "max_noise_value": 0.4
+    },
+    {
+      "name": "Mountains",
+      "min_noise_value": 0.4,
+      "max_noise_value": 1.0
+    }
+  ],
+  "chunk_size": 32,
+  "view_distance": 4,
+  "screen_width": 800,
+  "screen_height": 600,
+  "scale": 16
+}
