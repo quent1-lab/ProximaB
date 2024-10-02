@@ -140,22 +140,60 @@ class World:
 
     def load_chunks_around_camera(self, camera_x, camera_y):
         """Charge les chunks autour de la position de la caméra."""
-        chunk_x = camera_x // self.config['chunk_size']
-        chunk_y = camera_y // self.config['chunk_size']
+        chunk_x = int(camera_x) // self.config['chunk_size']
+        chunk_y = int(camera_y) // self.config['chunk_size']
         for cx in range(chunk_x - self.config['view_distance'], chunk_x + self.config['view_distance'] + 1):
             for cy in range(chunk_y - self.config['view_distance'], chunk_y + self.config['view_distance'] + 1):
                 self.get_chunk(cx, cy)
+    
+    def is_within_bounds(self, x, y):
+        """Vérifie si les coordonnées (x, y) sont dans les limites du monde généré."""
+        # Si le monde est théoriquement infini (généré à la demande), tout est dans les limites
+        return True  # On considère que les coordonnées sont toujours valides
 
 class Camera:
     """Classe gérant la position de la caméra et le chargement dynamique des chunks."""
-    def __init__(self, world, config, start_x=0, start_y=0):
+    def __init__(self, world, config, mode="fixed", target_pnj=None, start_x=0, start_y=0):
         self.world = world
         self.x = start_x
         self.y = start_y
+        self.config = config
         self.screen_width = config['screen_width']
         self.screen_height = config['screen_height']
         self.scale = config['scale']  # Échelle de conversion mètres -> pixels (par ex. 1 mètre = 32 pixels)
         self.screen = pygame.display.set_mode((self.screen_width, self.screen_height))
+        self.mode = mode  # Modes: "fixed", "free", "follow"
+        self.target_pnj = target_pnj  # PNJ à suivre si en mode "follow"
+        self.speed = 10  # Vitesse de déplacement de la caméra en mode libre
+
+    def update(self, delta_time):
+        """Met à jour la position de la caméra en fonction de son mode."""
+        if self.mode == "follow" and self.target_pnj:
+            # Suivre la position du PNJ
+            self.x = self.target_pnj.x - (self.config['screen_width'] // 2)
+            self.y = self.target_pnj.y - (self.config['screen_height'] // 2)
+            self.update_chunks()
+        elif self.mode == "free":
+            # Déplacer la caméra manuellement (ajoute ton propre contrôle ici)
+            keys = pygame.key.get_pressed()  # Utilisation de Pygame pour les touches
+            dx, dy = 0, 0
+            if keys[pygame.K_LEFT]:
+                dx = -1.0 * self.speed * delta_time
+            if keys[pygame.K_RIGHT]:
+                dx = 1.0 * self.speed * delta_time
+            if keys[pygame.K_UP]:
+                dy = -1.0 * self.speed * delta_time
+            if keys[pygame.K_DOWN]:
+                dy = 1.0 * self.speed * delta_time
+            self.move(dx, dy)
+
+    def set_mode(self, mode, target_pnj=None):
+        """Change le mode de la caméra."""
+        self.mode = mode
+        if mode == "follow":
+            self.target_pnj = target_pnj
+        else:
+            self.target_pnj = None
     
     def move(self, dx, dy):
         """Déplace la caméra et met à jour les chunks visibles."""
@@ -172,8 +210,8 @@ class Camera:
         self.screen.fill((135, 206, 235))  # Couleur de fond (bleu ciel)
 
         # Afficher les chunks
-        chunk_x = self.x // self.world.config['chunk_size']
-        chunk_y = self.y // self.world.config['chunk_size']
+        chunk_x = int(self.x) * self.config["scale"] // self.world.config['chunk_size']
+        chunk_y = int(self.y) * self.config["scale"] // self.world.config['chunk_size']
         for cx in range(chunk_x - self.world.config['view_distance'], chunk_x + self.world.config['view_distance'] + 1):
             for cy in range(chunk_y - self.world.config['view_distance'], chunk_y + self.world.config['view_distance'] + 1):
                 chunk = self.world.get_chunk(cx, cy)
@@ -217,11 +255,12 @@ def main():
 
     # Créer le monde et la caméra
     world = World(config)
-    camera = Camera(world, config)
+    camera = Camera(world, config, mode="free")
 
-    # Ajouter des PNJ avec des tailles variables
+    # Ajouter des PNJ avec des tailles var  iables
     pnj1 = PNJ(10, 10, world, config, size=1.6)  # 1.6 mètres
     pnj2 = PNJ(12, 10, world, config, size=1.8)  # 1.8 mètres
+    pnj1.set_target(50, 50)  # Le PNJ doit se rendre aux coordonnées (50, 50)
     world.add_pnj(pnj1)
     world.add_pnj(pnj2)
 
@@ -233,6 +272,22 @@ def main():
 
         # Mise à jour des PNJ
         world.update_pnj(delta_time)
+        
+        pnj1.move(delta_time)
+        
+        # Changer le mode de la caméra selon l'input
+        keys = pygame.key.get_pressed()
+        if keys[pygame.K_KP1] and camera.mode != "fixed":
+            print("Mode fixe")
+            camera.set_mode("fixed")
+        elif keys[pygame.K_KP2] and camera.mode != "free":
+            print("Mode libre")
+            camera.set_mode("free")
+        elif keys[pygame.K_KP3] and camera.mode != "follow":
+            print("Mode follow")
+            camera.set_mode("follow", target_pnj=pnj1)
+        # Mise à jour de la caméra
+        camera.update(delta_time)
 
         # Rendu de la caméra
         camera.render()
