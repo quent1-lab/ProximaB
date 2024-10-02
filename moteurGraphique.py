@@ -65,6 +65,34 @@ class Chunk:
             return biome1
         else:
             return biome2
+    
+    def generate_tiles(self, noise_generator):
+        """Génère les types de terrain dans ce chunk en utilisant le bruit de Perlin."""
+        tiles = []
+        for x in range(self.chunk_size):
+            row = []
+            for y in range(self.chunk_size):
+                noise_value = noise_generator.get_noise(self.x_offset + x, self.y_offset + y)
+                if noise_value < 0.2:
+                    row.append('Water')  # Zone d'eau
+                elif noise_value < 0.5:
+                    row.append('Plains')  # Zone de plaine
+                else:
+                    row.append('Mountains')  # Zone de montagnes
+            tiles.append(row)
+        return tiles
+
+    def get_tile_at(self, x, y):
+        """Retourne le type de terrain pour les coordonnées données."""
+        chunk_x = int(x - self.x_offset)
+        chunk_y = int(y - self.y_offset)
+        if 0 <= chunk_x < self.chunk_size and 0 <= chunk_y < self.chunk_size:
+            return self.tiles[chunk_x][chunk_y]
+        return 'Unknown'  # En dehors du chunk
+    
+    def get_tiles(self):
+        """Retourne tous les types de terrain dans ce chunk."""
+        return self.tiles
 
 class World:
     """Classe gérant le monde et les chunks générés."""
@@ -73,6 +101,25 @@ class World:
         self.loaded_chunks = {}  # Dictionnaire stockant les chunks chargés
         self.config = config
         self.pnj_list = []  # Liste des PNJ dans le monde
+        self.chunks = {}  # Dictionnaire pour stocker les chunks générés
+
+    def get_chunk(self, chunk_x, chunk_y):
+        """Retourne un chunk basé sur ses coordonnées, en le générant si nécessaire."""
+        if (chunk_x, chunk_y) not in self.chunks:
+            # Générer un nouveau chunk s'il n'existe pas
+            self.chunks[(chunk_x, chunk_y)] = Chunk(chunk_x * self.config['chunk_size'], chunk_y * self.config['chunk_size'], self.noise_generator, self.config)
+        return self.chunks[(chunk_x, chunk_y)]
+
+    def get_tile_at(self, x, y):
+        """Retourne le type de terrain pour les coordonnées globales (x, y)."""
+        chunk_x = int(x) // self.config['chunk_size']
+        chunk_y = int(y) // self.config['chunk_size']
+        chunk = self.get_chunk(chunk_x, chunk_y)
+        
+        # Calculer les coordonnées locales dans le chunk
+        local_x = int(x) % self.config['chunk_size']
+        local_y = int(y) % self.config['chunk_size']
+        return chunk.tiles[local_x][local_y]
     
     def add_pnj(self, pnj):
         """Ajoute un PNJ au monde."""
@@ -152,6 +199,10 @@ class Camera:
                     color = (34, 139, 34)  # Vert pour les plaines
                 elif tile_type == 'Mountains':
                     color = (139, 137, 137)  # Gris pour les montagnes
+                elif tile_type == 'Water':
+                    color = (65, 105, 225)
+                elif tile_type == 'Beach':
+                    color = (244, 164, 96)
                 else:
                     color = (0, 100, 0)  # Vert foncé pour d'autres biomes
 

@@ -7,11 +7,11 @@
     {
       "name": "Water",
       "min_noise_value": -1.0,
-      "max_noise_value": -0.3
+      "max_noise_value": -0.2
     },
     {
       "name": "Beach",
-      "min_noise_value": -0.3,
+      "min_noise_value": -0.2,
       "max_noise_value": -0.1
     },
     {

@@ -68,6 +68,31 @@ class PNJ(Entity):
         self.friction_coefficient = 0.1  # Coefficient de frottement (ex: surface glissante ou rugueuse)
         self.bounce_factor = 0.5  # Facteur de rebond (1 = rebond parfait, 0 = aucun rebond)
         self.size = size  # Taille du PNJ en mètres (par exemple, 1.75 m)
+        self.in_water = False
+
+    def can_traverse(self, tile_type):
+        """Vérifie si le PNJ peut traverser un type de terrain."""
+        if tile_type == 'Water' and not self.in_boat():
+            return False
+        return True
+
+    def in_boat(self):
+        """Vérifie si le PNJ dispose d'un moyen de transport aquatique."""
+        # Ici on peut ajouter la logique pour gérer si le PNJ possède un bateau
+        return self.in_water and self.has_boat()
+
+    def move(self, delta_time):
+        """Déplace le PNJ en fonction des règles de terrain et de physique."""
+        # Obtenir le type de terrain sur lequel se trouve le PNJ
+        current_tile = self.world.get_tile_at(self.x, self.y)
+        
+        if self.can_traverse(current_tile):
+            # Appliquer les frottements et déplacer le PNJ normalement
+            self.apply_friction()
+            super().move(delta_time)
+        else:
+            # Si le PNJ est dans l'eau sans bateau, il ne peut pas avancer
+            print(f"PNJ bloqué par l'eau à la position ({self.x}, {self.y})")
 
     def apply_friction(self):
         """Applique les frottements pour ralentir le PNJ."""
@@ -109,6 +134,19 @@ class PNJ(Entity):
         # Déplacement en tenant compte des frottements et des collisions
         self.apply_friction()
         self.move(delta_time)
+    
+    def apply_friction(self):
+        """Applique les frottements pour ralentir le PNJ en fonction du type de terrain."""
+        current_tile = self.world.get_tile_at(self.x, self.y)
+        if current_tile == 'Water':
+            self.vx *= 0.5  # Frottement élevé dans l'eau
+            self.vy *= 0.5
+        elif current_tile == 'Mountains':
+            self.vx *= 0.8  # Déplacement plus lent dans les montagnes
+            self.vy *= 0.8
+        else:
+            self.vx *= (1 - self.friction_coefficient)
+            self.vy *= (1 - self.friction_coefficient)
     
     def render(self, screen, scale):
         """Affiche graphiquement le PNJ sur l'écran."""
