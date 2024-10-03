@@ -8,6 +8,8 @@ class Entity:
     def __init__(self, x, y, world, config):
         self.x = x
         self.y = y
+        self.offset_x = 0
+        self.offset_y = 0
         self.vx = 1  # Vitesse horizontale
         self.vy = 1  # Vitesse verticale (affectée par la gravité)
         self.world = world

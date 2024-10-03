@@ -187,8 +187,8 @@ class Camera:
 
         # Appliquer l'offset de la caméra aux entités
         for pnj in self.world.pnj_list:
-            pnj.x -= dx
-            pnj.y -= dy
+            pnj.offset_x -= dx
+            pnj.offset_y -= dy
 
         self.world.load_chunks_around_camera(self.x, self.y)
 
@@ -253,8 +253,8 @@ class Camera:
 
     def render_pnj(self, pnj):
         """Affiche un PNJ avec un décalage par rapport à la caméra."""
-        screen_x = int(pnj.x * self.scale - self.x)  # Appliquer l'offset de la caméra
-        screen_y = int(pnj.y * self.scale - self.y)  # Appliquer l'offset de la caméra
+        screen_x = int((pnj.x+pnj.offset_x) * self.scale - self.x)  # Appliquer l'offset de la caméra
+        screen_y = int((pnj.y+pnj.offset_y) * self.scale - self.y)  # Appliquer l'offset de la caméra
 
         # Dessiner le PNJ comme un cercle ou une autre forme
         pygame.draw.circle(self.screen, (255, 0, 0), (screen_x, screen_y), int(self.scale // 2))
