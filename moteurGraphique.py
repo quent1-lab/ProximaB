@@ -101,15 +101,11 @@ class World:
         self.loaded_chunks = {}  # Dictionnaire stockant les chunks chargés
         self.config = config
         self.pnj_list = []  # Liste des PNJ dans le monde
-        self.chunks = {}  # Dictionnaire pour stocker les chunks générés
 
-    def get_chunk(self, chunk_x, chunk_y):
-        """Retourne un chunk basé sur ses coordonnées, en le générant si nécessaire."""
-        if (chunk_x, chunk_y) not in self.chunks:
-            # Générer un nouveau chunk s'il n'existe pas
-            self.chunks[(chunk_x, chunk_y)] = Chunk(chunk_x * self.config['chunk_size'], chunk_y * self.config['chunk_size'], self.noise_generator, self.config)
-        return self.chunks[(chunk_x, chunk_y)]
-
+    def generate_tiles(self):
+        """Génère les tuiles du chunk (placeholder, remplacez par votre logique de génération)."""
+        return [[0 for _ in range(self.world.config['chunk_size'])] for _ in range(self.world.config['chunk_size'])]
+    
     def get_tile_at(self, x, y):
         """Retourne le type de terrain pour les coordonnées globales (x, y)."""
         chunk_x = int(x) // self.config['chunk_size']
@@ -137,7 +133,7 @@ class World:
             # Générer et stocker le chunk s'il n'existe pas encore
             self.loaded_chunks[(chunk_x, chunk_y)] = Chunk(chunk_x * self.config['chunk_size'], chunk_y * self.config['chunk_size'], self.noise_generator, self.config)
         return self.loaded_chunks[(chunk_x, chunk_y)]
-
+    
     def load_chunks_around_camera(self, camera_x, camera_y):
         """Charge les chunks autour de la position de la caméra."""
         chunk_x = int(camera_x) // self.config['chunk_size']
@@ -152,99 +148,116 @@ class World:
         return True  # On considère que les coordonnées sont toujours valides
 
 class Camera:
-    """Classe gérant la position de la caméra et le chargement dynamique des chunks."""
-    def __init__(self, world, config, mode="fixed", target_pnj=None, start_x=0, start_y=0):
+    """Classe gérant la caméra comme entité invisible et fixe, les chunks se déplacent autour d'elle."""
+    def __init__(self, world, config, mode="free", start_x=0, start_y=0):
         self.world = world
         self.x = start_x
         self.y = start_y
         self.config = config
         self.screen_width = config['screen_width']
         self.screen_height = config['screen_height']
-        self.scale = config['scale']  # Échelle de conversion mètres -> pixels (par ex. 1 mètre = 32 pixels)
+        self.scale = config['scale']  # Échelle initiale (zoom de base)
+        self.zoom_speed = 0.5 # Vitesse de zoom
         self.screen = pygame.display.set_mode((self.screen_width, self.screen_height))
-        self.mode = mode  # Modes: "fixed", "free", "follow"
-        self.target_pnj = target_pnj  # PNJ à suivre si en mode "follow"
-        self.speed = 10  # Vitesse de déplacement de la caméra en mode libre
-
+    
     def update(self, delta_time):
-        """Met à jour la position de la caméra en fonction de son mode."""
-        if self.mode == "follow" and self.target_pnj:
-            # Suivre la position du PNJ
-            self.x = self.target_pnj.x - (self.config['screen_width'] // 2)
-            self.y = self.target_pnj.y - (self.config['screen_height'] // 2)
-            self.update_chunks()
-        elif self.mode == "free":
-            # Déplacer la caméra manuellement (ajoute ton propre contrôle ici)
-            keys = pygame.key.get_pressed()  # Utilisation de Pygame pour les touches
-            dx, dy = 0, 0
-            if keys[pygame.K_LEFT]:
-                dx = -1.0 * self.speed * delta_time
-            if keys[pygame.K_RIGHT]:
-                dx = 1.0 * self.speed * delta_time
-            if keys[pygame.K_UP]:
-                dy = -1.0 * self.speed * delta_time
-            if keys[pygame.K_DOWN]:
-                dy = 1.0 * self.speed * delta_time
-            self.move(dx, dy)
+        """Met à jour le zoom dynamique et le déplacement des chunks pour donner l'effet de mouvement."""
+        self.handle_zoom()
 
-    def set_mode(self, mode, target_pnj=None):
-        """Change le mode de la caméra."""
-        self.mode = mode
-        if mode == "follow":
-            self.target_pnj = target_pnj
-        else:
-            self.target_pnj = None
-    
-    def move(self, dx, dy):
-        """Déplace la caméra et met à jour les chunks visibles."""
-        self.x += dx
-        self.y += dy
-        self.update_chunks()
-    
-    def update_chunks(self):
-        """Charge les chunks autour de la nouvelle position de la caméra."""
+        # Les chunks se déplacent en fonction des touches pressées
+        keys = pygame.key.get_pressed()
+        dx, dy = 0, 0
+        if keys[pygame.K_LEFT]:
+            dx = -1.0 * self.config['camera_speed'] * delta_time
+        if keys[pygame.K_RIGHT]:
+            dx = 1.0 * self.config['camera_speed'] * delta_time
+        if keys[pygame.K_UP]:
+            dy = -1.0 * self.config['camera_speed'] * delta_time
+        if keys[pygame.K_DOWN]:
+            dy = 1.0 * self.config['camera_speed'] * delta_time
+        
+        # Appliquer le mouvement des chunks pour simuler le déplacement de la caméra
+        self.move_chunks(dx, dy)
+
+    def move_chunks(self, dx, dy):
+        """Simule le déplacement de la caméra en déplaçant les chunks et en appliquant un offset aux entités."""
+        for chunk_pos, chunk in self.world.loaded_chunks.items():
+            chunk.x_offset -= dx
+            chunk.y_offset -= dy
+
+        # Appliquer l'offset de la caméra aux entités
+        for pnj in self.world.pnj_list:
+            pnj.x -= dx
+            pnj.y -= dy
+
         self.world.load_chunks_around_camera(self.x, self.y)
+
+    def handle_zoom(self):
+        """Gère le zoom dynamique avec la molette de la souris."""
+        zoom_in = pygame.mouse.get_pressed()[0]  # Bouton gauche pour zoom avant
+        zoom_out = pygame.mouse.get_pressed()[2]  # Bouton droit pour zoom arrière
+        
+        if zoom_in:
+            self.scale += self.zoom_speed
+        if zoom_out and self.scale > self.zoom_speed:  # Empêcher un zoom trop petit
+            self.scale -= self.zoom_speed
     
     def render(self):
-        """Affiche le monde et les PNJ sur l'écran."""
+        """Affiche les chunks et PNJ avec la caméra fixée au centre de la fenêtre."""
         self.screen.fill((135, 206, 235))  # Couleur de fond (bleu ciel)
-
-        # Afficher les chunks
-        chunk_x = int(self.x) * self.config["scale"] // self.world.config['chunk_size']
-        chunk_y = int(self.y) * self.config["scale"] // self.world.config['chunk_size']
+        
+        # Affichage des chunks décalés en fonction du zoom et de leur position
+        chunk_x = int(self.x // (self.world.config['chunk_size'] * self.scale))
+        chunk_y = int(self.y // (self.world.config['chunk_size'] * self.scale))
         for cx in range(chunk_x - self.world.config['view_distance'], chunk_x + self.world.config['view_distance'] + 1):
             for cy in range(chunk_y - self.world.config['view_distance'], chunk_y + self.world.config['view_distance'] + 1):
                 chunk = self.world.get_chunk(cx, cy)
                 self.render_chunk(chunk)
 
-        # Afficher les PNJ
+        # Affichage des PNJ
         for pnj in self.world.pnj_list:
-            pnj.render(self.screen, self.scale)
-
-        # Mettre à jour l'affichage
+            self.render_pnj(pnj)
+        
         pygame.display.flip()
 
     def render_chunk(self, chunk):
-        """Affiche un chunk à l'écran."""
+        """Affiche un chunk avec ses tuiles et les délimitations."""
         for x in range(chunk.chunk_size):
             for y in range(chunk.chunk_size):
                 tile_type = chunk.tiles[x][y]
                 screen_x = int((chunk.x_offset + x) * self.scale)
                 screen_y = int((chunk.y_offset + y) * self.scale)
                 
-                # Dessiner les tuiles en fonction du type de terrain
                 if tile_type == 'Plains':
-                    color = (34, 139, 34)  # Vert pour les plaines
+                    color = (34, 139, 34)
                 elif tile_type == 'Mountains':
-                    color = (139, 137, 137)  # Gris pour les montagnes
+                    color = (139, 137, 137)
                 elif tile_type == 'Water':
                     color = (65, 105, 225)
                 elif tile_type == 'Beach':
-                    color = (244, 164, 96)
+                    color = (238, 214, 175)
                 else:
-                    color = (0, 100, 0)  # Vert foncé pour d'autres biomes
+                    color = (0, 100, 0)
 
                 pygame.draw.rect(self.screen, color, pygame.Rect(screen_x, screen_y, self.scale, self.scale))
+
+        chunk_border_color = (255, 255, 255)
+        pygame.draw.rect(self.screen, chunk_border_color, 
+                         pygame.Rect(chunk.x_offset * self.scale, chunk.y_offset * self.scale, 
+                                     chunk.chunk_size * self.scale, chunk.chunk_size * self.scale), 1)
+
+        # Dessin des coordonnées des chunks
+        font = pygame.font.Font(None, 24)
+        text = font.render(f"Chunk ({chunk.x_offset}, {chunk.y_offset})", True, (255, 255, 255))
+        self.screen.blit(text, (chunk.x_offset * self.scale, chunk.y_offset * self.scale))
+
+    def render_pnj(self, pnj):
+        """Affiche un PNJ avec un décalage par rapport à la caméra."""
+        screen_x = int(pnj.x * self.scale - self.x)  # Appliquer l'offset de la caméra
+        screen_y = int(pnj.y * self.scale - self.y)  # Appliquer l'offset de la caméra
+
+        # Dessiner le PNJ comme un cercle ou une autre forme
+        pygame.draw.circle(self.screen, (255, 0, 0), (screen_x, screen_y), int(self.scale // 2))
 
 def main():
     # Charger la configuration

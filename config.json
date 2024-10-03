@@ -29,5 +29,6 @@
   "view_distance": 4,
   "screen_width": 800,
   "screen_height": 600,
-  "scale": 16
+  "scale": 16,
+  "camera_speed": 10
 }
