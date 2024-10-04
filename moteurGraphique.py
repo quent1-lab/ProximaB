@@ -28,6 +28,7 @@ class Chunk:
         self.y_offset = y_offset
         self.chunk_size = config['chunk_size']
         self.biomes = config['biomes']
+        self.transition_zone = config.get('transition_zone', 0.2)  # Largeur de la zone de transition
         self.tiles = self.generate_chunk(noise_generator)
     
     def generate_chunk(self, noise_generator):
@@ -46,15 +47,15 @@ class Chunk:
         for i, biome in enumerate(self.biomes):
             if biome['min_noise_value'] <= value < biome['max_noise_value']:
                 # Si on est proche d'une frontière entre deux biomes, créer une transition douce
-                if i > 0 and value < biome['min_noise_value'] + 0.1:
+                if i > 0 and value < biome['min_noise_value'] + self.transition_zone:
                     # Transition avec le biome précédent
                     prev_biome = self.biomes[i - 1]
-                    mix_factor = (value - biome['min_noise_value']) / 0.1
+                    mix_factor = (value - biome['min_noise_value']) / self.transition_zone
                     return self.interpolate_biomes(prev_biome['name'], biome['name'], mix_factor)
-                elif i < len(self.biomes) - 1 and value > biome['max_noise_value'] - 0.1:
+                elif i < len(self.biomes) - 1 and value > biome['max_noise_value'] - self.transition_zone:
                     # Transition avec le biome suivant
                     next_biome = self.biomes[i + 1]
-                    mix_factor = (biome['max_noise_value'] - value) / 0.1
+                    mix_factor = (biome['max_noise_value'] - value) / self.transition_zone
                     return self.interpolate_biomes(biome['name'], next_biome['name'], mix_factor)
                 return biome['name']
         return 'Unknown'
@@ -65,34 +66,6 @@ class Chunk:
             return biome1
         else:
             return biome2
-    
-    def generate_tiles(self, noise_generator):
-        """Génère les types de terrain dans ce chunk en utilisant le bruit de Perlin."""
-        tiles = []
-        for x in range(self.chunk_size):
-            row = []
-            for y in range(self.chunk_size):
-                noise_value = noise_generator.get_noise(self.x_offset + x, self.y_offset + y)
-                if noise_value < 0.2:
-                    row.append('Water')  # Zone d'eau
-                elif noise_value < 0.5:
-                    row.append('Plains')  # Zone de plaine
-                else:
-                    row.append('Mountains')  # Zone de montagnes
-            tiles.append(row)
-        return tiles
-
-    def get_tile_at(self, x, y):
-        """Retourne le type de terrain pour les coordonnées données."""
-        chunk_x = int(x - self.x_offset)
-        chunk_y = int(y - self.y_offset)
-        if 0 <= chunk_x < self.chunk_size and 0 <= chunk_y < self.chunk_size:
-            return self.tiles[chunk_x][chunk_y]
-        return 'Unknown'  # En dehors du chunk
-    
-    def get_tiles(self):
-        """Retourne tous les types de terrain dans ce chunk."""
-        return self.tiles
 
 class World:
     """Classe gérant le monde et les chunks générés."""
@@ -101,6 +74,32 @@ class World:
         self.loaded_chunks = {}  # Dictionnaire stockant les chunks chargés
         self.config = config
         self.pnj_list = []  # Liste des PNJ dans le monde
+        self.visible_chunks = set()  # Suivi des chunks actuellement visibles
+    
+    def unload_chunks_outside_view(self, left_bound, right_bound, top_bound, bottom_bound):
+        """Décharge les chunks qui sont hors de la zone visible de la caméra."""
+        chunk_size = self.config['chunk_size']
+        
+        # Déterminer les coordonnées des chunks dans les limites visibles
+        left_chunk = int(left_bound) // chunk_size
+        right_chunk = int(right_bound) // chunk_size
+        top_chunk = int(top_bound) // chunk_size
+        bottom_chunk = int(bottom_bound) // chunk_size
+        
+        # Créer un set pour les nouveaux chunks visibles
+        new_visible_chunks = set()
+        for chunk_x in range(left_chunk, right_chunk + 1):
+            for chunk_y in range(top_chunk, bottom_chunk + 1):
+                new_visible_chunks.add((chunk_x, chunk_y))
+        
+        # Décharger les chunks qui ne sont plus visibles
+        chunks_to_unload = self.visible_chunks - new_visible_chunks
+        for chunk_coords in chunks_to_unload:
+            if chunk_coords in self.loaded_chunks:
+                del self.loaded_chunks[chunk_coords]  # Décharger le chunk
+        
+        # Mettre à jour les chunks visibles
+        self.visible_chunks = new_visible_chunks
 
     def generate_tiles(self):
         """Génère les tuiles du chunk (placeholder, remplacez par votre logique de génération)."""
@@ -134,13 +133,20 @@ class World:
             self.loaded_chunks[(chunk_x, chunk_y)] = Chunk(chunk_x * self.config['chunk_size'], chunk_y * self.config['chunk_size'], self.noise_generator, self.config)
         return self.loaded_chunks[(chunk_x, chunk_y)]
     
-    def load_chunks_around_camera(self, camera_x, camera_y):
-        """Charge les chunks autour de la position de la caméra."""
-        chunk_x = int(camera_x) // self.config['chunk_size']
-        chunk_y = int(camera_y) // self.config['chunk_size']
-        for cx in range(chunk_x - self.config['view_distance'], chunk_x + self.config['view_distance'] + 1):
-            for cy in range(chunk_y - self.config['view_distance'], chunk_y + self.config['view_distance'] + 1):
-                self.get_chunk(cx, cy)
+    def load_chunks_around_camera(self, left_bound, right_bound, top_bound, bottom_bound):
+        """Charge les chunks dans la zone définie par les limites visibles de la caméra."""
+        chunk_size = self.config['chunk_size']
+
+        # Déterminer les coordonnées des chunks à charger
+        left_chunk = int(left_bound) // chunk_size
+        right_chunk = int(right_bound) // chunk_size
+        top_chunk = int(top_bound) // chunk_size
+        bottom_chunk = int(bottom_bound) // chunk_size
+
+        # Charger tous les chunks dans la zone visible
+        for chunk_x in range(left_chunk, right_chunk + 1):
+            for chunk_y in range(top_chunk, bottom_chunk + 1):
+                self.get_chunk(chunk_x, chunk_y)
     
     def is_within_bounds(self, x, y):
         """Vérifie si les coordonnées (x, y) sont dans les limites du monde généré."""
@@ -163,15 +169,15 @@ class Camera:
         self.camera_center_x = self.screen_width // 2  # Caméra centrée horizontalement
         self.camera_center_y = self.screen_height // 2  # Caméra centrée verticalement
         self.scale = config['scale']  # Échelle initiale (zoom de base)
-        self.zoom_speed = 0.5 # Vitesse de zoom
+        self.zoom_speed = 0.5  # Vitesse de zoom
         self.screen = pygame.display.set_mode((self.screen_width, self.screen_height))
-    
+
     def set_mode(self, mode, target_pnj=None):
         """Définit le mode de la caméra (fixe, libre ou suivi d'un PNJ)."""
         self.mode = mode
         if mode == "follow":
             self.target_pnj = target_pnj
-    
+
     def update(self, delta_time):
         """Met à jour le zoom dynamique et le déplacement des chunks pour donner l'effet de mouvement."""
         self.handle_zoom()
@@ -189,24 +195,39 @@ class Camera:
             if keys[pygame.K_DOWN]:
                 dy = 1.0 * self.config['camera_speed'] * delta_time
             self.move(dx, dy)    
-        elif self.mode == "follow":
+        elif self.mode == "follow" and self.target_pnj:
             # Suivre la position du PNJ
             self.world_offset_x = self.target_pnj.x - self.camera_center_x / self.scale
             self.world_offset_y = self.target_pnj.y - self.camera_center_y / self.scale
             self.update_chunks()
-        
+
+        # Toujours s'assurer que les chunks sont chargés après mise à jour de la caméra
+        self.update_chunks()
 
     def move(self, dx, dy):
         """Déplace le monde en fonction du déplacement de la caméra."""
         self.world_offset_x += dx / self.scale
         self.world_offset_y += dy / self.scale
         self.update_chunks()
-    
+
     def update_chunks(self):
-        """Charge les chunks autour de la position actuelle de la caméra."""
+        """Charge et décharge les chunks autour de la position actuelle de la caméra."""
         camera_world_x = self.camera_center_x / self.scale + self.world_offset_x
         camera_world_y = self.camera_center_y / self.scale + self.world_offset_y
-        self.world.load_chunks_around_camera(camera_world_x, camera_world_y)
+        
+        # Calculer la taille du chunk en termes de distance dans le monde
+        chunk_size_in_world = self.config['chunk_size']
+        
+        # Calculer les limites visibles de la caméra en termes de coordonnées du monde
+        left_bound = camera_world_x - (self.screen_width / 2) / self.scale
+        right_bound = camera_world_x + (self.screen_width / 2) / self.scale
+        top_bound = camera_world_y - (self.screen_height / 2) / self.scale
+        bottom_bound = camera_world_y + (self.screen_height / 2) / self.scale
+
+        # Charger les nouveaux chunks et décharger ceux qui ne sont plus visibles
+        self.world.load_chunks_around_camera(left_bound, right_bound, top_bound, bottom_bound)
+        self.world.unload_chunks_outside_view(left_bound, right_bound, top_bound, bottom_bound)
+
 
     def handle_zoom(self):
         """Gère le zoom dynamique avec la molette de la souris."""
@@ -217,7 +238,7 @@ class Camera:
             self.scale += self.zoom_speed
         if zoom_out and self.scale > self.zoom_speed:  # Empêcher un zoom trop petit
             self.scale -= self.zoom_speed
-    
+
     def render(self):
         """Affiche le monde et les PNJ avec déplacement du décor en fonction de la caméra."""
         self.screen.fill((135, 206, 235))  # Fond bleu ciel
@@ -243,16 +264,10 @@ class Camera:
                 screen_y = int((chunk.y_offset + y - self.world_offset_y) * self.scale)
 
                 # Déterminer la couleur en fonction du biome
-                if tile_type == 'Plains':
-                    color = (34, 139, 34)
-                elif tile_type == 'Mountains':
-                    color = (139, 137, 137)
-                elif tile_type == 'Water':
-                    color = (65, 105, 225)
-                elif tile_type == 'Beach':
-                    color = (238, 214, 175)
-                else:
-                    color = (0, 100, 0)
+                for biome in self.config['biomes']:
+                    if tile_type == biome['name']:
+                        color = biome['color']
+                        break
 
                 pygame.draw.rect(self.screen, color, pygame.Rect(screen_x, screen_y, self.scale, self.scale))
 
@@ -265,9 +280,8 @@ class Camera:
 
     def render_pnj(self, screen_x, screen_y):
         """Affiche un PNJ avec un décalage par rapport à la caméra."""
-
-        # Dessiner le PNJ comme un cercle ou une autre forme
         pygame.draw.circle(self.screen, (255, 0, 0), (screen_x, screen_y), int(self.scale // 2))
+
 
 def main():
     # Charger la configuration
