@@ -2,7 +2,8 @@ import json
 import pygame
 import numpy as np
 import perlin_noise
-from entity import Entity, PNJ
+import uuid
+from entity import PNJ, Animal, Arbre, Aliment
 
 # Charger la configuration depuis un fichier JSON
 def load_config(file_path):
@@ -73,7 +74,7 @@ class World:
         self.noise_generator = PerlinNoiseGenerator(config)
         self.loaded_chunks = {}  # Dictionnaire stockant les chunks chargés
         self.config = config
-        self.pnj_list = []  # Liste des PNJ dans le monde
+        self.entities = {}  # Dict des entités dans le monde
         self.visible_chunks = set()  # Suivi des chunks actuellement visibles
         self.recent_chunks = {}  # Suivi des chunks récemment visibles
         self.chunk_cache_duration = config.get('chunk_cache_duration', 10)  # Durée de vie des chunks récents (par défaut 10 cycles)
@@ -130,15 +131,36 @@ class World:
         local_y = int(y) % self.config['chunk_size']
         return chunk.tiles[local_x][local_y]
     
-    def add_pnj(self, pnj):
-        """Ajoute un PNJ au monde."""
-        self.pnj_list.append(pnj)
+    def add_entity(self, entity):
+        """Ajoute une entité au monde."""
+        if entity.entity_type not in self.entities:
+            self.entities[entity.entity_type] = []
+        self.entities[entity.entity_type].append(entity)
     
-    def update_pnj(self, delta_time):
-        """Met à jour les PNJ dans le monde."""
-        for pnj in self.pnj_list:
-            pnj.move(delta_time)
-            pnj.interact_with_other_pnj(self.pnj_list)
+    def remove_entity(self, entity_id):
+        """Supprime une entité du monde."""
+        for entity_type, entity_list in self.entities.items():
+            for i, entity in enumerate(entity_list):
+                if entity.id == entity_id:
+                    del entity_list[i]
+    
+    def get_entity(self, entity_id):
+        """Retourne une entité par son ID."""
+        for entity_type, entity_list in self.entities.items():
+            for entity in entity_list:
+                if entity.id == entity_id:
+                    return entity
+        return None
+    
+    def generate_id(self):
+        """Génère un ID unique pour une entité."""
+        return str(uuid.uuid4())
+    
+    def update_entities(self, delta_time):
+        """Met à jour toutes les entités du monde."""
+        for entity_type, entity_list in self.entities.items():
+            for entity in entity_list:
+                entity.update(delta_time)
 
     def get_chunk(self, chunk_x, chunk_y):
         """Retourne un chunk, le génère si nécessaire."""
@@ -262,10 +284,11 @@ class Camera:
             self.render_chunk(chunk)
 
         # Afficher les PNJ
-        for pnj in self.world.pnj_list:
-            screen_x = (pnj.x - self.world_offset_x) * self.scale
-            screen_y = (pnj.y - self.world_offset_y) * self.scale
-            self.render_pnj(screen_x, screen_y)
+        for entity_type, entity_list in self.world.entities.items():
+            for entity in entity_list:
+                screen_x = int((entity.x - self.world_offset_x) * self.scale)
+                screen_y = int((entity.y - self.world_offset_y) * self.scale)
+                entity.render(self.screen, self.scale, screen_x, screen_y)
 
         pygame.display.flip()
 
@@ -292,10 +315,20 @@ class Camera:
                                      (chunk.y_offset - self.world_offset_y) * self.scale, 
                                      chunk.chunk_size * self.scale, chunk.chunk_size * self.scale), 1)
 
+        # Dessiner le chemin du PNJ
+        for pnj in self.world.entities['PNJ']:
+            for i in range(len(pnj.path) - 1):
+                start_x, start_y = pnj.path[i]
+                end_x, end_y = pnj.path[i + 1]
+                pygame.draw.line(self.screen, (255, 0, 0), 
+                                 ((start_x - self.world_offset_x) * self.scale, (start_y - self.world_offset_y) * self.scale),
+                                 ((end_x - self.world_offset_x) * self.scale, (end_y - self.world_offset_y) * self.scale))
+
+        
+
     def render_pnj(self, screen_x, screen_y):
         """Affiche un PNJ avec un décalage par rapport à la caméra."""
         pygame.draw.circle(self.screen, (255, 0, 0), (screen_x, screen_y), int(self.scale // 2))
-
 
 def main():
     # Charger la configuration
@@ -309,11 +342,23 @@ def main():
     camera = Camera(world, config, mode="free")
 
     # Ajouter des PNJ avec des tailles var  iables
-    pnj1 = PNJ(10, 10, world, config, size=1.6)  # 1.6 mètres
-    pnj2 = PNJ(12, 10, world, config, size=1.8)  # 1.8 mètres
+    pnj1 = PNJ(10, 10, world, config, id=world.generate_id(), size=1.6)  # 1.6 mètres
+    pnj2 = PNJ(12, 10, world, config, id=world.generate_id(),size=1.8)  # 1.8 mètres
     pnj1.set_target(50, 50)  # Le PNJ doit se rendre aux coordonnées (50, 50)
-    world.add_pnj(pnj1)
-    world.add_pnj(pnj2)
+    world.add_entity(pnj1)
+    world.add_entity(pnj2)
+    
+    # Ajouter des animaux
+    animal1 = Animal(20, 20, world, config,id=world.generate_id())
+    animal2 = Animal(22, 20, world, config,id=world.generate_id())
+    world.add_entity(animal1)
+    world.add_entity(animal2)
+    
+    # Ajouter des arbres
+    arbre1 = Arbre(30, 30, world, config, id=world.generate_id())
+    arbre2 = Arbre(32, 30, world, config, id=world.generate_id())
+    world.add_entity(arbre1)
+    world.add_entity(arbre2)
 
     # Boucle principale de simulation
     clock = pygame.time.Clock()
@@ -322,9 +367,15 @@ def main():
         delta_time = clock.tick(60) / 1000.0  # 60 FPS, delta_time en secondes
 
         # Mise à jour des PNJ
-        world.update_pnj(delta_time)
+        world.update_entities(delta_time)
         
         pnj1.move(delta_time)
+        
+        # Mise à jour des entités
+        animal1.wander(delta_time)
+        animal2.wander(delta_time)
+        arbre1.update(delta_time)
+        arbre2.update(delta_time)
         
         # Changer le mode de la caméra selon l'input
         keys = pygame.key.get_pressed()
@@ -337,9 +388,9 @@ def main():
         elif keys[pygame.K_KP3] and camera.mode != "follow":
             print("Mode follow")
             camera.set_mode("follow", target_pnj=pnj1)
+        
         # Mise à jour de la caméra
         camera.update(delta_time)
-
         # Rendu de la caméra
         camera.render()
 

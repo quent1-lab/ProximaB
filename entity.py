@@ -1,30 +1,38 @@
 import random
 import pygame
-import heapq
 import math
+import heapq
 
 class Entity:
-    """Classe représentant une entité physique avec des règles de physique."""
-    def __init__(self, x, y, world, config):
+    """Classe représentant une entité générique dans le monde."""
+    def __init__(self, x, y, world, config, size=1.0, entity_type="generic"):
         self.x = x
         self.y = y
-        self.vx = 1  # Vitesse horizontale
-        self.vy = 1  # Vitesse verticale (affectée par la gravité)
+        self.vx = 0  # Vitesse horizontale
+        self.vy = 0  # Vitesse verticale (affectée par la gravité)
+        self.size = size  # Taille de l'entité
         self.world = world
         self.config = config
+        self.entity_type = entity_type  # Type d'entité (PNJ, Animal, Arbre, etc.)
         self.gravity = 9.81  # Gravité (m/s^2)
+        self.friction_coefficient = 0.1  # Coefficient de frottement par défaut
         self.on_ground = False  # Indique si l'entité est au sol
-
+        self.in_water = False  # Indique si l'entité est dans l'eau
+    
     def apply_gravity(self, delta_time):
         """Applique la gravité si l'entité n'est pas au sol."""
         if not self.on_ground:
             self.vy += self.gravity * delta_time  # Appliquer la gravité
-        else:
-            self.vy = 0  # Si l'entité est au sol, elle ne tombe plus
 
+    def apply_friction(self):
+        """Applique les frottements pour ralentir l'entité."""
+        if self.on_ground:
+            self.vx *= (1 - self.friction_coefficient)
+            self.vy *= (1 - self.friction_coefficient)
+    
     def move(self, delta_time):
         """Déplace l'entité en fonction de sa vitesse et gère les collisions."""
-        #self.apply_gravity(delta_time)
+        self.apply_gravity(delta_time)
         
         # Calculer la nouvelle position
         new_x = self.x + self.vx * delta_time
@@ -32,10 +40,10 @@ class Entity:
         
         # Vérifier les collisions avec le sol
         self.on_ground = self.collides_with_ground(new_x, new_y)
-
+        
         self.x = new_x
         self.y = new_y
-    
+
     def collides_with_ground(self, x, y):
         """Vérifie si l'entité entre en collision avec le sol."""
         chunk_x = int(x // self.config['chunk_size'])
@@ -47,129 +55,103 @@ class Entity:
         # Si la tuile est une montagne ou un autre biome solide, il y a collision
         return chunk.tiles[local_x][local_y] in ['Mountains', 'Plains', 'Beach', 'Solid']
 
-    def get_ground_level(self, x, y):
-        """Retourne la position Y du sol le plus proche sous l'entité."""
-        chunk_x = int(x // self.config['chunk_size'])
-        chunk_y = int(y // self.config['chunk_size'])
-        chunk = self.world.get_chunk(chunk_x, chunk_y)
-        local_x = int(x % self.config['chunk_size'])
-        local_y = int(y % self.config['chunk_size'])
-        for local_y in range(local_y, -1, -1):
-            if chunk.tiles[local_x][local_y] in ['Mountains', 'Plains', 'Beach', 'Solid']:
-                return local_y
-        return y  # Si aucune collision détectée, on ne change pas la position Y
+    def render(self, screen, scale, screen_x, screen_y):
+        """Affiche graphiquement l'entité sur l'écran."""
+        # Convertir la position en pixels en fonction de l'échelle
+        size_in_pixels = int(self.size * scale)
+        
+        # Dessiner l'entité (un cercle par défaut) comme une représentation simplifiée
+        pygame.draw.circle(screen, (255, 0, 0), (screen_x, screen_y), size_in_pixels // 2)
+
+    def update(self, delta_time):
+        """Met à jour l'entité."""
+        self.move(delta_time)
+
+    def __str__(self) -> str:
+        return f"{self.entity_type} at ({self.x}, {self.y})"
 
 class PNJ(Entity):
-    """Classe représentant un PNJ avec des interactions et des règles de physique."""
-    def __init__(self, x, y, world, config, size=1.75, speed=1.0):
-        super().__init__(x, y, world, config)
-        self.interaction_radius = 5  # Rayon d'interaction entre les PNJ
-        self.friction_coefficient = 0.1  # Coefficient de frottement (ex: surface glissante ou rugueuse)
-        self.bounce_factor = 0.5  # Facteur de rebond (1 = rebond parfait, 0 = aucun rebond)
-        self.size = size  # Taille du PNJ en mètres (par exemple, 1.75 m)
-        self.speed = speed  # Vitesse du PNJ (unités par seconde)
-        self.in_water = False
-        self.path = []  # Le chemin optimal calculé
-        self.target = None  # La cible du PNJ
+    """Classe représentant un PNJ."""
+    def __init__(self, x, y, world, config, id, size=1.75, speed=1.0):
+        super().__init__(x, y, world, config, size, entity_type="PNJ")
+        self.id = id
+        self.speed = speed
+        self.target = None
         self.pathfinder = Pathfinding(world)
+        self.path = []
 
     def set_target(self, target_x, target_y):
-        """Définit une cible pour le PNJ et calcule le chemin optimal."""
+        """Définit une cible pour le PNJ et calcule le chemin."""
         self.target = (target_x, target_y)
         self.path = self.pathfinder.a_star((self.x, self.y), self.target)
 
     def move(self, delta_time):
-        """Déplace le PNJ le long du chemin calculé par l'algorithme A*."""
+        """Déplace le PNJ vers la cible."""
         if self.path:
             next_pos = self.path[0]
             dx = next_pos[0] - self.x
             dy = next_pos[1] - self.y
             distance = math.sqrt(dx ** 2 + dy ** 2)
             if distance > 0:
-                # Déplacement en fonction de la vitesse du PNJ
+                # Déplacement en fonction de la vitesse
                 self.vx = (dx / distance) * self.speed
                 self.vy = (dy / distance) * self.speed
                 super().move(delta_time)
             
-            # Si le PNJ atteint la prochaine case, on la retire du chemin
             if math.isclose(self.x, next_pos[0], abs_tol=0.1) and math.isclose(self.y, next_pos[1], abs_tol=0.1):
                 self.path.pop(0)
-
-    def can_traverse(self, tile_type):
-        """Vérifie si le PNJ peut traverser un type de terrain."""
-        if tile_type == 'Water' and not self.in_boat():
-            return False
-        return True
-
-    def in_boat(self):
-        """Vérifie si le PNJ dispose d'un moyen de transport aquatique."""
-        # Ici on peut ajouter la logique pour gérer si le PNJ possède un bateau
-        return self.in_water and self.has_boat()
-
-    def apply_friction(self):
-        """Applique les frottements pour ralentir le PNJ."""
-        if self.on_ground:
-            self.vx *= (1 - self.friction_coefficient)
-            self.vy *= (1 - self.friction_coefficient)
-
-    def interact_with_other_pnj(self, pnj_list):
-        """Interagit avec d'autres PNJ dans le rayon d'interaction."""
-        for other_pnj in pnj_list:
-            if other_pnj != self:
-                distance = self.get_distance(other_pnj)
-                if distance < self.interaction_radius:
-                    self.avoid_collision(other_pnj)
-                    # Exemples d'autres interactions : se suivre, échanger des infos, etc.
     
-    def get_distance(self, other_pnj):
-        """Calcule la distance entre deux PNJ."""
-        return ((self.x - other_pnj.x)**2 + (self.y - other_pnj.y)**2)**0.5
+    def __str__(self) -> str:
+        return super().__str__() + f" PNJ {self.id}"
 
-    def avoid_collision(self, other_pnj):
-        """Évite les collisions avec un autre PNJ en ajustant la vitesse."""
-        dx = self.x - other_pnj.x
-        dy = self.y - other_pnj.y
-        distance = self.get_distance(other_pnj)
-        if distance > 0:
-            # Ajuster la vitesse pour éviter la collision
-            self.vx += dx / distance * 0.1
-            self.vy += dy / distance * 0.1
+class Animal(Entity):
+    """Classe représentant un animal."""
+    def __init__(self, x, y, world, config, id, size=1.5, speed=1.2):
+        super().__init__(x, y, world, config, size, entity_type="Animal")
+        self.speed = speed
+        self.id = id
 
-    def handle_collision(self, delta_time):
-        """Gère les collisions avec le terrain ou les PNJ."""
-        if self.collides_with_ground(self.x, self.y):
-            self.vy = -self.vy * self.bounce_factor  # Rebond vertical
-            self.on_ground = True
-        else:
-            self.on_ground = False
+    def wander(self, delta_time):
+        """Déplacement aléatoire pour les animaux."""
+        direction = random.choice([(1, 0), (-1, 0), (0, 1), (0, -1)])
+        self.vx, self.vy = direction[0] * self.speed, direction[1] * self.speed
+        super().move(delta_time)
+    
+    def __str__(self) -> str:
+        return super().__str__() + f" Animal {self.id}"
+
+class Arbre(Entity):
+    """Classe représentant un arbre."""
+    def __init__(self, x, y, world, config, id, size=5.0):
+        super().__init__(x, y, world, config, size, entity_type="Arbre")
+        self.id = id
         
-        # Déplacement en tenant compte des frottements et des collisions
-        self.apply_friction()
-        self.move(delta_time)
-    
-    def apply_friction(self):
-        """Applique les frottements pour ralentir le PNJ en fonction du type de terrain."""
-        current_tile = self.world.get_tile_at(self.x, self.y)
-        if current_tile == 'Water':
-            self.vx *= 0.5  # Frottement élevé dans l'eau
-            self.vy *= 0.5
-        elif current_tile == 'Mountains':
-            self.vx *= 0.8  # Déplacement plus lent dans les montagnes
-            self.vy *= 0.8
-        else:
-            self.vx *= (1 - self.friction_coefficient)
-            self.vy *= (1 - self.friction_coefficient)
+    def render(self, screen, scale, screen_x, screen_y):
+        """Affiche graphiquement l'arbre sur l'écran."""
+        size_in_pixels = int(self.size * scale)
+        
+        # Dessiner l'arbre comme un rectangle (tronc)
+        pygame.draw.rect(screen, (0, 100, 0), pygame.Rect(screen_x, screen_y - size_in_pixels, size_in_pixels//2, size_in_pixels))
+
+    def __str__(self) -> str:
+        return super().__str__() + f" Arbre {self.id}"
+class Aliment(Entity):
+    """Classe représentant un aliment."""
+    def __init__(self, x, y, world, config, id, size=0.5):
+        super().__init__(x, y, world, config, size, entity_type="Aliment")
+        self.id = id
     
     def render(self, screen, scale):
-        """Affiche graphiquement le PNJ sur l'écran."""
-        # Convertir la position en pixels en fonction de l'échelle
+        """Affiche graphiquement l'aliment sur l'écran."""
         screen_x = int(self.x * scale)
         screen_y = int(self.y * scale)
         size_in_pixels = int(self.size * scale)
         
-        # Dessiner le PNJ comme un rectangle pour simplifier
-        pygame.draw.rect(screen, (0, 255, 0), pygame.Rect(screen_x, screen_y - size_in_pixels, size_in_pixels//2, size_in_pixels))
-
+        # Dessiner l'aliment comme un petit cercle
+        pygame.draw.circle(screen, (0, 255, 0), (screen_x, screen_y), size_in_pixels // 2)
+        
+    def __str__(self) -> str:
+        return super().__str__() + f" Aliment {self.id}"
 
 class Pathfinding:
     """Classe pour gérer le pathfinding avec l'algorithme A*."""
@@ -194,6 +176,8 @@ class Pathfinding:
             return float('inf')  # Infranchissable sans bateau
         elif tile_type == 'Mountains':
             return 5  # Coût élevé
+        elif tile_type == 'Beach':
+            return 2
         elif tile_type == 'Plains':
             return 1  # Terrain facile
         return 2  # Coût par défaut
