@@ -30,5 +30,5 @@
   "screen_width": 800,
   "screen_height": 600,
   "scale": 16,
-  "camera_speed": 10
+  "camera_speed": 100
 }
