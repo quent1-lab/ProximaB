@@ -75,9 +75,11 @@ class World:
         self.config = config
         self.pnj_list = []  # Liste des PNJ dans le monde
         self.visible_chunks = set()  # Suivi des chunks actuellement visibles
+        self.recent_chunks = {}  # Suivi des chunks récemment visibles
+        self.chunk_cache_duration = config.get('chunk_cache_duration', 10)  # Durée de vie des chunks récents (par défaut 10 cycles)
     
     def unload_chunks_outside_view(self, left_bound, right_bound, top_bound, bottom_bound):
-        """Décharge les chunks qui sont hors de la zone visible de la caméra."""
+        """Décharge les chunks qui sont hors de la zone visible de la caméra après un délai."""
         chunk_size = self.config['chunk_size']
         
         # Déterminer les coordonnées des chunks dans les limites visibles
@@ -92,14 +94,26 @@ class World:
             for chunk_y in range(top_chunk, bottom_chunk + 1):
                 new_visible_chunks.add((chunk_x, chunk_y))
         
-        # Décharger les chunks qui ne sont plus visibles
-        chunks_to_unload = self.visible_chunks - new_visible_chunks
+        # Marquer les chunks récemment visibles et décharger ceux dont le compteur atteint 0
+        chunks_to_unload = []
+        for chunk_coords in self.recent_chunks.copy():
+            if chunk_coords not in new_visible_chunks:
+                self.recent_chunks[chunk_coords] -= 1  # Décrémenter le compteur
+                if self.recent_chunks[chunk_coords] <= 0:
+                    chunks_to_unload.append(chunk_coords)  # Le chunk sera déchargé
+            else:
+                del self.recent_chunks[chunk_coords]  # Retirer du cache si visible à nouveau
+        
+        # Ajouter les nouveaux chunks visibles au cache
+        self.visible_chunks = new_visible_chunks
+        for chunk_coords in self.visible_chunks:
+            if chunk_coords in self.loaded_chunks and chunk_coords not in self.recent_chunks:
+                self.recent_chunks[chunk_coords] = self.chunk_cache_duration
+        
+        # Décharger les chunks qui sont restés hors de la vue trop longtemps
         for chunk_coords in chunks_to_unload:
             if chunk_coords in self.loaded_chunks:
                 del self.loaded_chunks[chunk_coords]  # Décharger le chunk
-        
-        # Mettre à jour les chunks visibles
-        self.visible_chunks = new_visible_chunks
 
     def generate_tiles(self):
         """Génère les tuiles du chunk (placeholder, remplacez par votre logique de génération)."""

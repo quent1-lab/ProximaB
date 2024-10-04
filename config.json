@@ -36,8 +36,9 @@
     }
   ],
   "transition_zone": 0.001,
+  "chunk_cache_duration": 10,
   "chunk_size": 32,
-  "view_distance": 4,
+  "view_distance": 3,
   "screen_width": 800,
   "screen_height": 600,
   "scale": 16,
