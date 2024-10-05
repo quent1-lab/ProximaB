@@ -353,6 +353,7 @@ def main():
     animal2 = Animal(22, 20, world, config,id=world.generate_id())
     world.add_entity(animal1)
     world.add_entity(animal2)
+    animal2.generate_random_path(10,49)  # Générer un chemin aléatoire pour l'animal 2
     
     # Ajouter des arbres
     arbre1 = Arbre(30, 30, world, config, id=world.generate_id())
@@ -373,9 +374,9 @@ def main():
         
         # Mise à jour des entités
         animal1.wander(delta_time)
-        animal2.wander(delta_time)
+        animal2.move_along_path(delta_time)
         arbre1.update(delta_time)
-        arbre2.update(delta_time)
+        #arbre2.update(delta_time)
         
         # Changer le mode de la caméra selon l'input
         keys = pygame.key.get_pressed()

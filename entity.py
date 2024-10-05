@@ -117,6 +117,36 @@ class Animal(Entity):
         self.vx, self.vy = direction[0] * self.speed, direction[1] * self.speed
         super().move(delta_time)
     
+    def generate_random_path(self, num_points, max_distance):
+        """Génère un chemin aléatoire avec un nombre de points et une distance maximale."""
+        self.path = [(self.x, self.y)]
+        for _ in range(num_points):
+            last_x, last_y = self.path[-1]
+            new_x = last_x + random.uniform(-max_distance, max_distance)
+            new_y = last_y + random.uniform(-max_distance, max_distance)
+            self.path.append((new_x, new_y))
+        self.current_target_index = 0
+
+    def move_along_path(self, delta_time):
+        """Déplace l'animal le long du chemin généré."""
+        if not self.path:
+            return
+
+        target_x, target_y = self.path[self.current_target_index]
+        direction_x = target_x - self.x
+        direction_y = target_y - self.y
+        distance = (direction_x**2 + direction_y**2)**0.5
+
+        if distance < self.speed * delta_time:
+            self.x, self.y = target_x, target_y
+            self.current_target_index += 1
+            if self.current_target_index >= len(self.path):
+                self.current_target_index = 0  # Recommence le chemin
+        else:
+            self.vx = (direction_x / distance) * self.speed
+            self.vy = (direction_y / distance) * self.speed
+            super().move(delta_time)
+    
     def __str__(self) -> str:
         return super().__str__() + f" Animal {self.id}"
 
@@ -131,10 +161,11 @@ class Arbre(Entity):
         size_in_pixels = int(self.size * scale)
         
         # Dessiner l'arbre comme un rectangle (tronc)
-        pygame.draw.rect(screen, (0, 100, 0), pygame.Rect(screen_x, screen_y - size_in_pixels, size_in_pixels//2, size_in_pixels))
+        pygame.draw.rect(screen, (120,120,36), pygame.Rect(screen_x, screen_y - size_in_pixels, size_in_pixels//2, size_in_pixels))
 
     def __str__(self) -> str:
         return super().__str__() + f" Arbre {self.id}"
+
 class Aliment(Entity):
     """Classe représentant un aliment."""
     def __init__(self, x, y, world, config, id, size=0.5):
@@ -193,7 +224,7 @@ class Pathfinding:
         while open_set:
             _, current = heapq.heappop(open_set)
             if current == goal:
-                return self.reconstruct_path(came_from, current)
+                return self.simplify_path(self.reconstruct_path(came_from, current))
 
             for neighbor in self.get_neighbors(current):
                 tentative_g_score = g_score[current] + self.get_cost(neighbor)
@@ -212,3 +243,39 @@ class Pathfinding:
             current = came_from[current]
             total_path.append(current)
         return total_path[::-1]
+
+    def is_line_passable(self, start, end):
+        """Vérifie si un segment de ligne droite entre deux points est franchissable."""
+        x1, y1 = start
+        x2, y2 = end
+        dx = abs(x2 - x1)
+        dy = abs(y2 - y1)
+        sx = 1 if x1 < x2 else -1
+        sy = 1 if y1 < y2 else -1
+        err = dx - dy
+
+        while (x1, y1) != (x2, y2):
+            if not self.world.is_within_bounds(x1, y1) or self.get_cost((x1, y1)) == float('inf'):
+                return False
+            e2 = err * 2
+            if e2 > -dy:
+                err -= dy
+                x1 += sx
+            if e2 < dx:
+                err += dx
+                y1 += sy
+
+        return True
+
+    def simplify_path(self, path):
+        """Simplifie le chemin en supprimant les points intermédiaires inutiles."""
+        if not path:
+            return path
+
+        simplified_path = [path[0]]
+        for i in range(2, len(path)):
+            if not self.is_line_passable(simplified_path[-1], path[i]):
+                simplified_path.append(path[i - 1])
+        simplified_path.append(path[-1])
+
+        return simplified_path
