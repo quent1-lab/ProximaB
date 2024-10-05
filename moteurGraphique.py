@@ -3,7 +3,8 @@ import pygame
 import numpy as np
 import perlin_noise
 import uuid
-from entity import PNJ, Animal, Arbre, Aliment
+from entity import Animal, Arbre, Aliment
+from PNJ import PNJ
 
 # Charger la configuration depuis un fichier JSON
 def load_config(file_path):
@@ -206,8 +207,7 @@ class World:
         for i in range(-radius, radius + 1):
             for j in range(-radius, radius + 1):
                 chunks.append(self.get_chunk(chunk_x + i, chunk_y + j))
-        return chunks
-        
+        return chunks     
     
     def load_chunks_around_camera(self, left_bound, right_bound, top_bound, bottom_bound):
         """Charge les chunks dans la zone définie par les limites visibles de la caméra."""
@@ -262,13 +262,13 @@ class Camera:
             # Les chunks se déplacent en fonction des touches pressées
             dx, dy = 0, 0
             keys = pygame.key.get_pressed()
-            if keys[pygame.K_LEFT]:
+            if keys[pygame.K_LEFT] or keys[pygame.K_q]:
                 dx = -1.0 * self.config['camera_speed'] * delta_time
-            if keys[pygame.K_RIGHT]:
+            if keys[pygame.K_RIGHT] or keys[pygame.K_d]:
                 dx = 1.0 * self.config['camera_speed'] * delta_time
-            if keys[pygame.K_UP]:
+            if keys[pygame.K_UP] or keys[pygame.K_z]:
                 dy = -1.0 * self.config['camera_speed'] * delta_time
-            if keys[pygame.K_DOWN]:
+            if keys[pygame.K_DOWN] or keys[pygame.K_s]:
                 dy = 1.0 * self.config['camera_speed'] * delta_time
             self.move(dx, dy)    
         elif self.mode == "follow" and self.target_pnj:
@@ -303,7 +303,6 @@ class Camera:
         # Charger les nouveaux chunks et décharger ceux qui ne sont plus visibles
         self.world.load_chunks_around_camera(left_bound, right_bound, top_bound, bottom_bound)
         self.world.unload_chunks_outside_view(left_bound, right_bound, top_bound, bottom_bound)
-
 
     def handle_zoom(self):
         """Gère le zoom dynamique avec la molette de la souris."""
@@ -357,9 +356,9 @@ class Camera:
 
         # Dessiner le chemin du PNJ
         for pnj in self.world.entities['PNJ']:
-            for i in range(len(pnj.path) - 1):
+            for i in range(len(pnj.path)):
                 start_x, start_y = pnj.x, pnj.y
-                end_x, end_y = pnj.path[i + 1]
+                end_x, end_y = pnj.path[i]
                 pygame.draw.line(self.screen, (255, 0, 0), 
                                  ((start_x - self.world_offset_x) * self.scale, (start_y - self.world_offset_y) * self.scale),
                                  ((end_x - self.world_offset_x) * self.scale, (end_y - self.world_offset_y) * self.scale))
