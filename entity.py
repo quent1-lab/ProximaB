@@ -32,28 +32,51 @@ class Entity:
     
     def move(self, delta_time):
         """Déplace l'entité en fonction de sa vitesse et gère les collisions."""
-        self.apply_gravity(delta_time)
-        
+        # Appliquer la gravité
+        #self.apply_gravity(delta_time)
+
         # Calculer la nouvelle position
         new_x = self.x + self.vx * delta_time
         new_y = self.y + self.vy * delta_time
-        
+
+        # Évitement des autres entités
+        self.avoid_collision(self.world.entities, delta_time)
+
         # Vérifier les collisions avec le sol
         self.on_ground = self.collides_with_ground(new_x, new_y)
-        
+
+        # Mise à jour de la position
         self.x = new_x
         self.y = new_y
-
+    
     def collides_with_ground(self, x, y):
         """Vérifie si l'entité entre en collision avec le sol."""
+        # Simulation d'une collision avec le sol (à adapter selon ton système de terrain)
         chunk_x = int(x // self.config['chunk_size'])
         chunk_y = int(y // self.config['chunk_size'])
         chunk = self.world.get_chunk(chunk_x, chunk_y)
         local_x = int(x % self.config['chunk_size'])
         local_y = int(y % self.config['chunk_size'])
-        
-        # Si la tuile est une montagne ou un autre biome solide, il y a collision
+
         return chunk.tiles[local_x][local_y] in ['Mountains', 'Plains', 'Beach', 'Solid']
+
+    def avoid_collision(self, entities, delta_time):
+        """Évite les collisions avec d'autres entités en ajustant la trajectoire."""
+        all_entities = all_entities = [entity for sublist in entities.values() for entity in sublist]
+        
+        for other_entity in all_entities:
+            if other_entity != self:
+                # Calculer la distance entre les deux entités
+                dx = other_entity.x - self.x
+                dy = other_entity.y - self.y
+                distance = math.sqrt(dx ** 2 + dy ** 2)
+
+                # Si la distance est inférieure à une certaine limite, éviter la collision
+                if distance < self.size * 2:  # On considère la somme des tailles des deux entités
+                    # Ajuster les vitesses pour éviter la collision
+                    avoidance_factor = 0.1  # Facteur pour ajuster l'évitement
+                    self.vx -= dx / distance * avoidance_factor
+                    self.vy -= dy / distance * avoidance_factor
 
     def render(self, screen, scale, screen_x, screen_y):
         """Affiche graphiquement l'entité sur l'écran."""
@@ -79,6 +102,63 @@ class PNJ(Entity):
         self.target = None
         self.pathfinder = Pathfinding(world)
         self.path = []
+        self.hunger = 100  # Niveau de faim (0 = mort de faim, 100 = rassasié)
+        self.thirst = 100  # Niveau de soif (0 = mort de soif, 100 = hydraté)
+        self.energy = 100  # Niveau d'énergie (0 = endormi, 100 = pleine forme)
+        self.tasks = []  # Liste des tâches à accomplir
+        self.collaborators = []  # Liste des PNJ avec qui il collabore
+    
+    def update(self, delta_time):
+        """Mise à jour du PNJ."""
+        self.update_needs(delta_time)
+        self.perform_tasks(delta_time)
+        self.move(delta_time)
+    
+    def update_needs(self, delta_time):
+        """Mise à jour des besoins naturels."""
+        self.hunger -= delta_time * 0.1  # Diminution de la faim
+        self.thirst -= delta_time * 0.15  # Diminution de la soif
+        self.energy -= delta_time * 0.05  # Diminution de l'énergie
+    
+    def add_task(self, task):
+        """Ajoute une tâche à la liste."""
+        self.tasks.append(task)
+    
+    def perform_tasks(self, delta_time):
+        """Effectue les tâches en fonction des besoins."""
+        if self.hunger < 20:
+            self.search_food()
+        elif self.thirst < 20:
+            self.search_water()
+        elif self.energy < 30:
+            self.rest()
+        else:
+            if self.tasks:
+                current_task = self.tasks[0]
+                current_task.perform(self, delta_time)
+    
+    def search_food(self):
+        """Cherche de la nourriture pour satisfaire la faim."""
+        print(f'{self} cherche de la nourriture...')
+        # Implémentation de la recherche de nourriture
+        
+    
+    def search_water(self):
+        """Cherche de l'eau pour s'hydrater."""
+        print(f'{self} cherche de l\'eau...')
+        # Implémentation de la recherche d'eau
+    
+    def rest(self):
+        """Récupère de l'énergie en se reposant."""
+        print(f'{self} se repose...')
+        self.energy += 10  # Régénération de l'énergie
+    
+    def collaborate(self, other_pnj):
+        """Collabore avec un autre PNJ."""
+        if other_pnj not in self.collaborators:
+            self.collaborators.append(other_pnj)
+            print(f'{self} collabore avec {other_pnj}.')
+            # Partager des tâches ou des ressources
 
     def set_target(self, target_x, target_y):
         """Définit une cible pour le PNJ et calcule le chemin."""

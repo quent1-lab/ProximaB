@@ -161,6 +161,37 @@ class World:
         for entity_type, entity_list in self.entities.items():
             for entity in entity_list:
                 entity.update(delta_time)
+    
+    def search_for_entities(self, x, y, radius, entity_type):
+        """Recherche des entités dans un rayon donné autour des coordonnées (x, y)."""
+        entities_in_radius = []
+        for entity in self.entities[entity_type]:
+            distance = np.sqrt((entity.x - x) ** 2 + (entity.y - y) ** 2)
+            if distance <= radius:
+                entities_in_radius.append(entity)
+        return entities_in_radius
+    
+    def get_closest_entity(self, x, y, entity_type):
+        """Retourne l'entité la plus proche des coordonnées (x, y)."""
+        closest_entity = None
+        closest_distance = np.inf
+        for entity in self.entities[entity_type]:
+            distance = np.sqrt((entity.x - x) ** 2 + (entity.y - y) ** 2)
+            if distance < closest_distance:
+                closest_entity = entity
+                closest_distance = distance
+        return closest_entity
+    
+    def find_closest_resource(self, x, y, resource_type):
+        """Recherche la ressource la plus proche des coordonnées (x, y)."""
+        closest_resource = None
+        closest_distance = np.inf
+        for entity in self.entities[resource_type]:
+            distance = np.sqrt((entity.x - x) ** 2 + (entity.y - y) ** 2)
+            if distance < closest_distance:
+                closest_resource = entity
+                closest_distance = distance
+        return closest_resource
 
     def get_chunk(self, chunk_x, chunk_y):
         """Retourne un chunk, le génère si nécessaire."""
@@ -318,7 +349,7 @@ class Camera:
         # Dessiner le chemin du PNJ
         for pnj in self.world.entities['PNJ']:
             for i in range(len(pnj.path) - 1):
-                start_x, start_y = pnj.path[i]
+                start_x, start_y = pnj.x, pnj.y
                 end_x, end_y = pnj.path[i + 1]
                 pygame.draw.line(self.screen, (255, 0, 0), 
                                  ((start_x - self.world_offset_x) * self.scale, (start_y - self.world_offset_y) * self.scale),
@@ -344,7 +375,7 @@ def main():
     # Ajouter des PNJ avec des tailles var  iables
     pnj1 = PNJ(10, 10, world, config, id=world.generate_id(), size=1.6)  # 1.6 mètres
     pnj2 = PNJ(12, 10, world, config, id=world.generate_id(),size=1.8)  # 1.8 mètres
-    pnj1.set_target(50, 50)  # Le PNJ doit se rendre aux coordonnées (50, 50)
+    #pnj1.set_target(50, 50)  # Le PNJ doit se rendre aux coordonnées (50, 50)
     world.add_entity(pnj1)
     world.add_entity(pnj2)
     
@@ -355,11 +386,11 @@ def main():
     world.add_entity(animal2)
     animal2.generate_random_path(10,49)  # Générer un chemin aléatoire pour l'animal 2
     
-    # Ajouter des arbres
-    arbre1 = Arbre(30, 30, world, config, id=world.generate_id())
-    arbre2 = Arbre(32, 30, world, config, id=world.generate_id())
-    world.add_entity(arbre1)
-    world.add_entity(arbre2)
+    # # Ajouter des arbres
+    # arbre1 = Arbre(30, 30, world, config, id=world.generate_id())
+    # arbre2 = Arbre(32, 30, world, config, id=world.generate_id())
+    # world.add_entity(arbre1)
+    # world.add_entity(arbre2)
 
     # Boucle principale de simulation
     clock = pygame.time.Clock()
@@ -369,14 +400,6 @@ def main():
 
         # Mise à jour des PNJ
         world.update_entities(delta_time)
-        
-        pnj1.move(delta_time)
-        
-        # Mise à jour des entités
-        animal1.wander(delta_time)
-        animal2.move_along_path(delta_time)
-        arbre1.update(delta_time)
-        #arbre2.update(delta_time)
         
         # Changer le mode de la caméra selon l'input
         keys = pygame.key.get_pressed()
