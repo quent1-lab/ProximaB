@@ -61,6 +61,14 @@ class Chunk:
                 return biome['name']
         return 'Unknown'
     
+    def get_tiles(self):
+        """Retourne les tuiles du chunk avec leurs coordonnées dans le monde et leur type de terrain."""
+        tiles = []
+        for x in range(self.chunk_size):
+            for y in range(self.chunk_size):
+                tiles.append((x + self.x_offset, y + self.y_offset, self.tiles[x][y]))
+        return tiles
+    
     def interpolate_biomes(self, biome1, biome2, mix_factor):
         """Mélange deux biomes en fonction du facteur de mixage."""
         if mix_factor < 0.5:
@@ -181,17 +189,6 @@ class World:
                 closest_entity = entity
                 closest_distance = distance
         return closest_entity
-    
-    def find_closest_resource(self, x, y, resource_type):
-        """Recherche la ressource la plus proche des coordonnées (x, y)."""
-        closest_resource = None
-        closest_distance = np.inf
-        for entity in self.entities[resource_type]:
-            distance = np.sqrt((entity.x - x) ** 2 + (entity.y - y) ** 2)
-            if distance < closest_distance:
-                closest_resource = entity
-                closest_distance = distance
-        return closest_resource
 
     def get_chunk(self, chunk_x, chunk_y):
         """Retourne un chunk, le génère si nécessaire."""
@@ -199,6 +196,18 @@ class World:
             # Générer et stocker le chunk s'il n'existe pas encore
             self.loaded_chunks[(chunk_x, chunk_y)] = Chunk(chunk_x * self.config['chunk_size'], chunk_y * self.config['chunk_size'], self.noise_generator, self.config)
         return self.loaded_chunks[(chunk_x, chunk_y)]
+    
+    def get_chunks_around(self,x,y,radius):
+        """Retourne les chunks autour des coordonnées (x, y) dans un rayon donné."""
+        chunk_size = self.config['chunk_size']
+        chunk_x = int(x) // chunk_size
+        chunk_y = int(y) // chunk_size
+        chunks = []
+        for i in range(-radius, radius + 1):
+            for j in range(-radius, radius + 1):
+                chunks.append(self.get_chunk(chunk_x + i, chunk_y + j))
+        return chunks
+        
     
     def load_chunks_around_camera(self, left_bound, right_bound, top_bound, bottom_bound):
         """Charge les chunks dans la zone définie par les limites visibles de la caméra."""
