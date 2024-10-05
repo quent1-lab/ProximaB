@@ -362,12 +362,61 @@ class Camera:
                 pygame.draw.line(self.screen, (255, 0, 0), 
                                  ((start_x - self.world_offset_x) * self.scale, (start_y - self.world_offset_y) * self.scale),
                                  ((end_x - self.world_offset_x) * self.scale, (end_y - self.world_offset_y) * self.scale))
-
         
+        # Ecriture du nombre de chunks chargés
+        font = pygame.font.Font(None, 24)
+        text = font.render(f"Chunks loaded: {len(self.world.loaded_chunks)}", True, (255, 255, 255))
+        self.screen.blit(text, (10, 40))
 
     def render_pnj(self, screen_x, screen_y):
         """Affiche un PNJ avec un décalage par rapport à la caméra."""
         pygame.draw.circle(self.screen, (255, 0, 0), (screen_x, screen_y), int(self.scale // 2))
+
+def handle_entity_hover_and_click(world, camera):
+    """Gère le survol des entités par la souris et l'affichage des données de l'entité survolée."""
+    mouse_x, mouse_y = pygame.mouse.get_pos()
+
+    # Convertir la position de la souris en coordonnées du monde
+    world_mouse_x = (mouse_x / camera.scale) + camera.world_offset_x
+    world_mouse_y = (mouse_y / camera.scale) + camera.world_offset_y
+
+    hovered_entity = None
+
+    # Parcourir toutes les entités pour vérifier si la souris survole l'une d'elles
+    for entity_type, entity_list in world.entities.items():
+        for entity in entity_list:
+            # Vérifier si la souris est sur l'entité
+            if entity.x - entity.size / 2 <= world_mouse_x <= entity.x + entity.size / 2 and entity.y - entity.size / 2 <= world_mouse_y <= entity.y + entity.size / 2:
+                hovered_entity = entity
+                break  # On peut sortir si une entité est trouvée
+
+    # Si une entité est survolée, afficher ses informations en haut à gauche
+    if hovered_entity:
+        display_entity_info(hovered_entity, camera)
+
+        # Si un clic gauche est détecté, centrer la caméra sur l'entité
+        if pygame.mouse.get_pressed()[0]:
+            print(f"Centrage de la caméra sur {hovered_entity}")
+            camera.mode = "follow"
+            camera.set_mode("follow", target_pnj=entity)
+
+def display_entity_info(entity, camera):
+    """Affiche les informations d'une entité survolée."""
+    name = entity.__class__.__name__
+    info = f"{name} at ({entity.x:.2f}, {entity.y:.2f})"
+    
+    # Récupérer dynamiquement tous les attributs potentiels comme énergie, faim, soif, etc.
+    attributes = ["energy", "hunger", "thirst"]
+    for attr in attributes:
+        value = getattr(entity, attr, None)
+        if value is not None:
+            info += f" | {attr.capitalize()}: {value:.2f}"
+    # Afficher les informations
+    font = pygame.font.Font(None, 24)
+    text = font.render(info, True, (255, 255, 255))
+    camera.screen.blit(text, (10, 10))
+    pygame.display.flip()
+
 
 def main():
     # Charger la configuration
@@ -423,8 +472,13 @@ def main():
         
         # Mise à jour de la caméra
         camera.update(delta_time)
+        
+        
         # Rendu de la caméra
         camera.render()
+        
+        # Gérer le survol des entités par la souris
+        handle_entity_hover_and_click(world, camera)
 
         # Gérer les événements (fermeture de la fenêtre, etc.)
         for event in pygame.event.get():

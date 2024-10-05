@@ -84,16 +84,6 @@ class PNJ(Entity):
             print(f'{self} est hydraté.')
             self.target_water = None
             self.task_manager.current_task.complete()  # Marquer la tâche comme complétée
-
-    def search_food(self):
-        """Cherche la nourriture la plus proche."""
-        closest_food = self.find_closest_resource('Food')  # Recherche la ressource 'Food'
-        if closest_food:
-            print(f'{self} a trouvé de la nourriture à {closest_food}.')
-            self.set_target(closest_food[0], closest_food[1])  # Définir la cible de déplacement
-            self.target_food = closest_food
-        else:
-            print(f'{self} ne trouve pas de nourriture proche.')
           
     def find_water(self):
         """Cherche la source d'eau la plus proche et vise une case adjacente pour y accéder."""
@@ -108,6 +98,16 @@ class PNJ(Entity):
                 print(f'{self} a trouvé de l\'eau, mais aucune case adjacente n\'est accessible.')
         else:
             print(f'{self} ne trouve pas d\'eau proche.')
+
+    def search_food(self):
+        """Cherche la nourriture la plus proche."""
+        closest_food = self.find_closest_resource('Food')  # Recherche la ressource 'Food'
+        if closest_food:
+            print(f'{self} a trouvé de la nourriture à {closest_food}.')
+            self.set_target(closest_food[0], closest_food[1])  # Définir la cible de déplacement
+            self.target_food = closest_food
+        else:
+            print(f'{self} ne trouve pas de nourriture proche.')
 
     def find_adjacent_accessible_tile(self, resource_tile):
         """Trouve une case adjacente à la ressource qui est accessible."""
@@ -135,19 +135,6 @@ class PNJ(Entity):
         print(f'{self} se repose...')
         self.energy += 10  # Régénération de l'énergie
     
-    def consume_resource(self, resource_type):
-        """Consomme la ressource (nourriture ou eau) une fois atteinte."""
-        if resource_type == 'Food' and self.target_food:
-            if math.isclose(self.x, self.target_food[0], abs_tol=0.5) and math.isclose(self.y, self.target_food[1], abs_tol=0.5):
-                print(f'{self} consomme la nourriture à {self.target_food}.')
-                self.hunger = min(self.hunger + 50, 100)  # Régénère la faim
-                self.target_food = None  # La nourriture a été consommée
-        elif resource_type == 'Water' and self.target_water:
-            if math.isclose(self.x, self.target_water[0], abs_tol=0.5) and math.isclose(self.y, self.target_water[1], abs_tol=0.5):
-                print(f'{self} boit de l\'eau à {self.target_water}.')
-                self.thirst = min(self.thirst + 50, 100)  # Régénère la soif
-                self.target_water = None  # L'eau a été consommée
-    
     def collaborate(self, other_pnj):
         """Collabore avec un autre PNJ."""
         if other_pnj not in self.collaborators:
@@ -161,7 +148,7 @@ class PNJ(Entity):
         closest_distance = float('inf')
         
         # Parcourir les chunks voisins pour trouver des ressources
-        for chunk in self.world.get_chunks_around(self.x, self.y, radius=5):  # Rayon de recherche
+        for chunk in self.world.get_chunks_around(self.x, self.y, radius=2):  # Rayon de recherche
             for x, y, tile in chunk.get_tiles():
                 if tile == resource_type:
                     distance = self.get_distance_from(x, y)
