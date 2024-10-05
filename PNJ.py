@@ -88,9 +88,14 @@ class PNJ(Entity):
     def find_water(self):
         """Cherche la source d'eau la plus proche et vise une case adjacente pour y accéder."""
         closest_water = self.find_closest_resource('Water')
+        
         if closest_water:
             adjacent_tile = self.find_adjacent_accessible_tile(closest_water)  # Trouver la case adjacente
-            if adjacent_tile:
+            # Vérifier si la distance est proche
+            if adjacent_tile and self.get_distance_from(*adjacent_tile) < 1:
+                print(f'{self} a trouvé de l\'eau à proximité')
+                self.target_water = adjacent_tile
+            elif adjacent_tile:
                 print(f'{self} a trouvé de l\'eau et va à une case adjacente à {adjacent_tile}.')
                 self.set_target(adjacent_tile[0], adjacent_tile[1])  # Vise la case adjacente
                 self.target_water = adjacent_tile
@@ -102,7 +107,11 @@ class PNJ(Entity):
     def search_food(self):
         """Cherche la nourriture la plus proche."""
         closest_food = self.find_closest_resource('Food')  # Recherche la ressource 'Food'
-        if closest_food:
+        # Vérifier si la ressource est juste à côté
+        adjacent_tile = self.find_adjacent_accessible_tile(closest_food)
+        if adjacent_tile:
+            print(f'{self} a trouvé de la nourriture à une case adjacente à {adjacent_tile}.')
+        elif closest_food:
             print(f'{self} a trouvé de la nourriture à {closest_food}.')
             self.set_target(closest_food[0], closest_food[1])  # Définir la cible de déplacement
             self.target_food = closest_food
@@ -155,7 +164,6 @@ class PNJ(Entity):
                     if distance < closest_distance:
                         closest_resource = (x, y)
                         closest_distance = distance
-        
         return closest_resource
 
     def get_distance_from(self, x, y):

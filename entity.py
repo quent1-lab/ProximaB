@@ -91,7 +91,7 @@ class Entity:
         self.move(delta_time)
 
     def __str__(self) -> str:
-        return f"{self.entity_type} at ({self.x}, {self.y})"
+        return f"{self.entity_type} at ({self.x:.1f}, {self.y:.1f})"
 
 class Animal(Entity):
     """Classe représentant un animal."""

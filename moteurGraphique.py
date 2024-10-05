@@ -163,7 +163,7 @@ class World:
     
     def generate_id(self):
         """Génère un ID unique pour une entité."""
-        return str(uuid.uuid4())
+        return str(uuid.uuid1())
     
     def update_entities(self, delta_time):
         """Met à jour toutes les entités du monde."""
