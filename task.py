@@ -49,19 +49,26 @@ class TaskManager:
             return
 
         # Exécuter la première tâche de la liste
-        self.current_task = self.tasks[0]
+        if not self.current_task:
+            print(f"{self.entity} commence la tâche: {self.tasks[0].name}")
+            self.current_task = self.tasks[0]
+        else:
+            if self.current_task.interrupted:
+                print(f"{self.entity} a été interrompu dans la tâche: {self.current_task.name}")
+                self.tasks.insert(0, self.current_task)
+                self.current_task = None
+                return
+        
         self.current_task.execute(self.entity, delta_time)
 
         if self.current_task.completed:
+            print(f"{self.entity} a terminé la tâche: {self.current_task.name}")
             if self.current_task.linked_tasks:
                 # Ajouter la tâche liée suivante
-                print(f"{self.entity} a terminé la tâche: {self.current_task.name}")
-                self.tasks.insert(0, self.current_task.linked_tasks.pop(0))
+                print(f"{self.entity} commence la tâche liée: {self.current_task.linked_tasks[0].name}")
+                self.tasks.insert(1, self.current_task.linked_tasks.pop(0))
+                self.current_task = None
             self.tasks.pop(0)  # Retirer la tâche terminée
-        
-        if self.current_task.interrupted:
-            self.tasks.pop(0)
-            self.current_task.interrupted = False
             
         if not self.tasks:
             self.current_task = None

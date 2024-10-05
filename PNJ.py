@@ -83,6 +83,7 @@ class PNJ(Entity):
         if self.thirst >= 100:
             print(f'{self} est hydraté.')
             self.target_water = None
+            self.task_manager.current_task.complete()  # Marquer la tâche comme complétée
 
     def search_food(self):
         """Cherche la nourriture la plus proche."""
