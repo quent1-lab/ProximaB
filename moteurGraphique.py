@@ -391,14 +391,20 @@ def handle_entity_hover_and_click(world, camera):
                 break  # On peut sortir si une entité est trouvée
 
     # Si une entité est survolée, afficher ses informations en haut à gauche
-    if hovered_entity:
+    if hovered_entity :
         display_entity_info(hovered_entity, camera)
 
         # Si un clic gauche est détecté, centrer la caméra sur l'entité
         if pygame.mouse.get_pressed()[0]:
-            print(f"Centrage de la caméra sur {hovered_entity}")
             camera.mode = "follow"
-            camera.set_mode("follow", target_pnj=entity)
+            camera.set_mode("follow", target_pnj=hovered_entity)
+            
+    if camera.mode == "follow":
+        display_entity_info(camera.target_pnj, camera)
+        
+        # Si un clic droit est détecté, arrêter de suivre le PNJ
+        if pygame.mouse.get_pressed()[2]:
+            camera.mode = "free"
 
 def display_entity_info(entity, camera):
     """Affiche les informations d'une entité survolée."""
