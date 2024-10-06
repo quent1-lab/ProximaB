@@ -35,10 +35,13 @@ class Entity:
         # Appliquer la gravité
         #self.apply_gravity(delta_time)
 
+        # Appliquer les frottements
+        self.apply_friction()
+
         # Calculer la nouvelle position
         new_x = self.x + self.vx * delta_time
         new_y = self.y + self.vy * delta_time
-
+        
         # Évitement des autres entités
         self.avoid_collision(self.world.entities, delta_time)
 
@@ -195,7 +198,7 @@ class Pathfinding:
 
     def get_cost(self, node):
         """Retourne le coût de déplacement pour une case donnée (en fonction du type de terrain)."""
-        tile_type = self.world.get_tile_at(node[0], node[1])
+        tile_type = self.world.get_tile_at(node[0], node[1]).biome
         if tile_type == 'Water':
             return float('inf')  # Infranchissable sans bateau
         elif tile_type == 'Mountains':

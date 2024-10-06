@@ -1,10 +1,12 @@
 import json
 import pygame
 import numpy as np
-import perlin_noise
 import uuid
-from entity import Animal, Arbre, Aliment
+import perlin_noise
+from entity import Animal
 from PNJ import PNJ
+from chunk_ import Chunk
+
 
 # Charger la configuration depuis un fichier JSON
 def load_config(file_path):
@@ -22,61 +24,7 @@ class PerlinNoiseGenerator:
         nx = x / chunk_size
         ny = y / chunk_size
         return self.noise([nx, ny])
-
-class Chunk:
-    """Classe représentant un chunk de terrain."""
-    def __init__(self, x_offset, y_offset, noise_generator, config):
-        self.x_offset = x_offset
-        self.y_offset = y_offset
-        self.chunk_size = config['chunk_size']
-        self.biomes = config['biomes']
-        self.transition_zone = config.get('transition_zone', 0.2)  # Largeur de la zone de transition
-        self.tiles = self.generate_chunk(noise_generator)
     
-    def generate_chunk(self, noise_generator):
-        """Génère un chunk avec des transitions douces entre biomes."""
-        chunk = np.zeros((self.chunk_size, self.chunk_size), dtype=object)
-        for x in range(self.chunk_size):
-            for y in range(self.chunk_size):
-                # Obtenir la valeur du bruit
-                noise_value = noise_generator.get_noise(x + self.x_offset, y + self.y_offset, self.chunk_size)
-                # Assigner le biome avec des transitions douces
-                chunk[x][y] = self.get_biome_with_transition(noise_value)
-        return chunk
-    
-    def get_biome_with_transition(self, value):
-        """Retourne un biome avec des transitions douces entre biomes."""
-        for i, biome in enumerate(self.biomes):
-            if biome['min_noise_value'] <= value < biome['max_noise_value']:
-                # Si on est proche d'une frontière entre deux biomes, créer une transition douce
-                if i > 0 and value < biome['min_noise_value'] + self.transition_zone:
-                    # Transition avec le biome précédent
-                    prev_biome = self.biomes[i - 1]
-                    mix_factor = (value - biome['min_noise_value']) / self.transition_zone
-                    return self.interpolate_biomes(prev_biome['name'], biome['name'], mix_factor)
-                elif i < len(self.biomes) - 1 and value > biome['max_noise_value'] - self.transition_zone:
-                    # Transition avec le biome suivant
-                    next_biome = self.biomes[i + 1]
-                    mix_factor = (biome['max_noise_value'] - value) / self.transition_zone
-                    return self.interpolate_biomes(biome['name'], next_biome['name'], mix_factor)
-                return biome['name']
-        return 'Unknown'
-    
-    def get_tiles(self):
-        """Retourne les tuiles du chunk avec leurs coordonnées dans le monde et leur type de terrain."""
-        tiles = []
-        for x in range(self.chunk_size):
-            for y in range(self.chunk_size):
-                tiles.append((x + self.x_offset, y + self.y_offset, self.tiles[x][y]))
-        return tiles
-    
-    def interpolate_biomes(self, biome1, biome2, mix_factor):
-        """Mélange deux biomes en fonction du facteur de mixage."""
-        if mix_factor < 0.5:
-            return biome1
-        else:
-            return biome2
-
 class World:
     """Classe gérant le monde et les chunks générés."""
     def __init__(self, config):
@@ -229,6 +177,21 @@ class World:
         # Si le monde est théoriquement infini (généré à la demande), tout est dans les limites
         return True  # On considère que les coordonnées sont toujours valides
 
+    def entity_is_present(self):
+        """Vérifie si une entité est présente sur une tuile, et met à jour la tuile en conséquence."""
+        for entity_type, entity_list in self.entities.items():
+            for entity in entity_list:
+                tile = self.get_tile_at(entity.x, entity.y)
+                tile.set_entity_presence(True)
+        
+    def entity_is_not_present(self):
+        """Met à jour la présence d'une entité sur une tuile."""
+        for tile in [t for t in self.tiles if t.has_entity]:
+            # Si l'entité n'est plus sur la tuile, mettre à jour la présence
+            if not tile.has_entity.is_at(tile.x, tile.y):
+                tile.set_entity_presence(False)
+        
+    
 class Camera:
     """Classe gérant la caméra comme entité invisible et fixe, les chunks se déplacent autour d'elle."""
     def __init__(self, world, config, mode="free", start_x=0, start_y=0):
@@ -335,10 +298,11 @@ class Camera:
         """Affiche un chunk avec déplacement en fonction de la caméra."""
         for x in range(chunk.chunk_size):
             for y in range(chunk.chunk_size):
-                tile_type = chunk.tiles[x][y]
+                tile_type = chunk.tiles[x][y].biome
                 screen_x = int((chunk.x_offset + x - self.world_offset_x) * self.scale)
                 screen_y = int((chunk.y_offset + y - self.world_offset_y) * self.scale)
 
+                color = (10,10,50)
                 # Déterminer la couleur en fonction du biome
                 for biome in self.config['biomes']:
                     if tile_type == biome['name']:
@@ -422,7 +386,6 @@ def display_entity_info(entity, camera):
     text = font.render(info, True, (255, 255, 255))
     camera.screen.blit(text, (10, 10))
     pygame.display.flip()
-
 
 def main():
     # Charger la configuration

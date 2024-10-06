@@ -93,12 +93,12 @@ class PNJ(Entity):
             adjacent_tile = self.find_adjacent_accessible_tile(closest_water)  # Trouver la case adjacente
             # Vérifier si la distance est proche
             if adjacent_tile and self.get_distance_from(*adjacent_tile) < 1:
-                print(f'{self} a trouvé de l\'eau à proximité')
                 self.target_water = adjacent_tile
             elif adjacent_tile:
-                print(f'{self} a trouvé de l\'eau et va à une case adjacente à {adjacent_tile}.')
                 self.set_target(adjacent_tile[0], adjacent_tile[1])  # Vise la case adjacente
                 self.target_water = adjacent_tile
+                # Indiquer que la case est la destination d'un PNJ
+                self.world.get_tile_at(*adjacent_tile).set_entity_destination(self)
             else:
                 print(f'{self} a trouvé de l\'eau, mais aucune case adjacente n\'est accessible.')
         else:
@@ -132,7 +132,8 @@ class PNJ(Entity):
         """Vérifie si une case est accessible pour le PNJ (non bloquée)."""
         # Ici, on vérifie si la tuile est traversable selon les règles du monde
         tile = self.world.get_tile_at(x, y)
-        return tile != 'Water' and tile != 'Obstacle'  # Exemple: doit être ni eau ni un obstacle
+        biome = tile.biome if tile else None
+        return biome != 'Water' and biome != 'Obstacle' and not tile.has_entity and not tile.entity_destination  # Exemple: doit être ni eau ni un obstacle
     
     def eat(self):
         """Mange de la nourriture pour récupérer de la faim."""
@@ -159,7 +160,7 @@ class PNJ(Entity):
         # Parcourir les chunks voisins pour trouver des ressources
         for chunk in self.world.get_chunks_around(self.x, self.y, radius=2):  # Rayon de recherche
             for x, y, tile in chunk.get_tiles():
-                if tile == resource_type:
+                if tile.biome == resource_type and not tile.has_entity and not tile.entity_destination:
                     distance = self.get_distance_from(x, y)
                     if distance < closest_distance:
                         closest_resource = (x, y)
