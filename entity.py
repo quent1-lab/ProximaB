@@ -81,13 +81,19 @@ class Entity:
                     self.vx -= dx / distance * avoidance_factor
                     self.vy -= dy / distance * avoidance_factor
 
-    def render(self, screen, scale, screen_x, screen_y):
-        """Affiche graphiquement l'entité sur l'écran."""
+    def render(self, screen, scale, screen_x, screen_y, color=(255, 0, 0), shape='circle', **kwargs):
+        """Affiche graphiquement l'entité sur l'écran avec des options de personnalisation."""
         # Convertir la position en pixels en fonction de l'échelle
         size_in_pixels = int(self.size * scale)
-        
-        # Dessiner l'entité (un cercle par défaut) comme une représentation simplifiée
-        pygame.draw.circle(screen, (255, 0, 0), (screen_x, screen_y), size_in_pixels // 2)
+
+        # Dessiner l'entité en fonction de la forme spécifiée
+        if shape == 'circle':
+            pygame.draw.circle(screen, color, (screen_x, screen_y), size_in_pixels // 2)
+        elif shape == 'square':
+            pygame.draw.rect(screen, color, (screen_x - size_in_pixels // 2, screen_y - size_in_pixels // 2, size_in_pixels, size_in_pixels))
+        # Ajouter d'autres formes si nécessaire
+        else:
+            raise ValueError(f"Forme non supportée: {shape}")
 
     def update(self, delta_time):
         """Met à jour l'entité."""
@@ -97,22 +103,73 @@ class Entity:
         return f"{self.entity_type} at ({self.x:.1f}, {self.y:.1f})"
 
 class Animal(Entity):
-    """Classe représentant un animal."""
-    def __init__(self, x, y, world, config, id, size=1.5, speed=1.2):
-        super().__init__(x, y, world, config, size, entity_type="Animal")
-        self.speed = speed
-        self.id = id
+    def __init__(self, name, x, y, world, energy=100, hunger=100, thirst=100):
+        super().__init__(x, y, world, world.config, entity_type="animal")
+        self.name = name
+        self.is_alive = True
+        self.speed = 1.0  # Vitesse de déplacement de base
+        self.intelligence = 0.5  # Niveau d'intelligence de l'animal (peut influencer ses décisions)
+        self.direction = (random.uniform(-1, 1), random.uniform(-1, 1))
+        self.normalize_direction()
+
+    def normalize_direction(self):
+        """Normalise le vecteur de direction."""
+        length = math.sqrt(self.direction[0] ** 2 + self.direction[1] ** 2)
+        if length > 0:
+            self.direction = (self.direction[0] / length, self.direction[1] / length)
 
     def wander(self, delta_time):
-        """Déplacement aléatoire pour les animaux."""
-        direction = random.choice([(1, 0), (-1, 0), (0, 1), (0, -1)])
-        self.vx, self.vy = direction[0] * self.speed, direction[1] * self.speed
+        """Déplacement aléatoire pour les animaux avec des mouvements plus réalistes."""
+        change = (random.uniform(-0.1, 0.1), random.uniform(-0.1, 0.1))
+        self.direction = (self.direction[0] + change[0], self.direction[1] + change[1])
+        self.normalize_direction()
+        self.vx, self.vy = self.direction[0] * self.speed, self.direction[1] * self.speed
+        self.vx = float(self.vx)
+        self.vy = float(self.vy)
         super().move(delta_time)
+        
+    def move(self):
+        """Logique de déplacement de l'animal."""
+        # Par exemple, recherche de nourriture ou d'eau si l'animal a faim ou soif
+        if self.hunger > 70:
+            self.search_for_food()
+        elif self.thirst > 70:
+            self.search_for_water()
+        else:
+            self.wander()
+
+    def search_for_food(self):
+        """Méthode de recherche de nourriture."""
+        # Logique de pathfinding pour trouver un fruit ou une autre source de nourriture
+        pass
+
+    def search_for_water(self):
+        """Méthode de recherche d'eau."""
+        # Utilise le pathfinding pour trouver une source d'eau
+        pass
+
+    def eat(self, food):
+        """L'animal mange la nourriture trouvée."""
+        food.consume(self)
+
+    def drink(self, water_tile):
+        """L'animal boit de l'eau."""
+        self.thirst -= 20  # Réduit la soif de l'animal
+
+    def die(self):
+        """L'animal meurt."""
+        self.is_alive = False
+        # Logique pour enlever l'animal du monde
+        pass
     
-    def update(self, delta_time):
-        """Mise à jour de l'animal."""
-        self.wander(delta_time)
-    
+    def react_to_pnj(self, pnj):
+        """Réaction de l'animal en fonction de la proximité avec un PNJ."""
+        distance = self.calculate_distance(pnj)
+        if distance < 5 and self.intelligence > 0.3:
+            self.run_away_from(pnj)  # L'animal fuit si le PNJ est trop proche
+        elif distance < 2:
+            self.attack(pnj)  # L'animal attaque s'il est carnivore et que le PNJ est trop proche
+
     def generate_random_path(self, num_points, max_distance):
         """Génère un chemin aléatoire avec un nombre de points et une distance maximale."""
         self.path = [(self.x, self.y)]
@@ -143,42 +200,41 @@ class Animal(Entity):
             self.vy = (direction_y / distance) * self.speed
             super().move(delta_time)
     
+    def update(self, delta_time):
+        """Mise à jour de l'animal."""
+        self.wander(delta_time)
+        
+    def render(self, screen, scale, screen_x, screen_y):
+        return super().render(screen, scale, screen_x, screen_y, color=(0, 255, 0), shape='square')
+    
     def __str__(self) -> str:
         return super().__str__() + f" Animal {self.id}"
 
-class Arbre(Entity):
-    """Classe représentant un arbre."""
-    def __init__(self, x, y, world, config, id, size=5.0):
-        super().__init__(x, y, world, config, size, entity_type="Arbre")
-        self.id = id
+class Food(Entity):
+    def __init__(self, name, nutrition_value, x, y, world):
+        super().__init__(x, y,world, world.config,size=0.5,entity_type="food")
+        self.name = name
+        self.nutrition_value = nutrition_value  # Valeur nutritive
+        self.is_consumed = False  # Indique si la nourriture a été consommée
         
-    def render(self, screen, scale, screen_x, screen_y):
-        """Affiche graphiquement l'arbre sur l'écran."""
-        size_in_pixels = int(self.size * scale)
-        
-        # Dessiner l'arbre comme un rectangle (tronc)
-        pygame.draw.rect(screen, (120,120,36), pygame.Rect(screen_x, screen_y - size_in_pixels, size_in_pixels//2, size_in_pixels))
+    def consume(self, entity):
+        """Méthode appelée lorsqu'un PNJ consomme cette nourriture."""
+        entity.hunger -= self.nutrition_value
+        # Supprimer la nourriture après consommation
+        self.remove_from_world()
 
-    def __str__(self) -> str:
-        return super().__str__() + f" Arbre {self.id}"
-
-class Aliment(Entity):
-    """Classe représentant un aliment."""
-    def __init__(self, x, y, world, config, id, size=0.5):
-        super().__init__(x, y, world, config, size, entity_type="Aliment")
-        self.id = id
+    def remove_from_world(self):
+        # Logique pour enlever l'élément du monde
+        pass
     
-    def render(self, screen, scale):
-        """Affiche graphiquement l'aliment sur l'écran."""
-        screen_x = int(self.x * scale)
-        screen_y = int(self.y * scale)
-        size_in_pixels = int(self.size * scale)
-        
-        # Dessiner l'aliment comme un petit cercle
-        pygame.draw.circle(screen, (0, 255, 0), (screen_x, screen_y), size_in_pixels // 2)
-        
+    def update(self, delta_time):
+        pass
+    
+    def render(self, screen, scale, screen_x, screen_y):
+        return super().render(screen, scale, screen_x, screen_y, color=(100, 20, 50), shape='circle')
+    
     def __str__(self) -> str:
-        return super().__str__() + f" Aliment {self.id}"
+        return f"{self.name} at ({self.x:.1f}, {self.y:.1f})"
 
 class Pathfinding:
     """Classe pour gérer le pathfinding avec l'algorithme A*."""

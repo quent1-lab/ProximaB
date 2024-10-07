@@ -1,12 +1,7 @@
-import json
-import pygame
-import numpy as np
-import uuid
-import perlin_noise
-from entity import Animal
+import json , random, pygame, uuid, perlin_noise, numpy as np
+from entity import Animal, Food
 from PNJ import PNJ
 from chunk_ import Chunk
-
 
 # Charger la configuration depuis un fichier JSON
 def load_config(file_path):
@@ -30,11 +25,13 @@ class World:
     def __init__(self, config):
         self.noise_generator = PerlinNoiseGenerator(config)
         self.loaded_chunks = {}  # Dictionnaire stockant les chunks chargés
+        self.tiles_with_entities = []  # Liste des tuiles ayant des entités
         self.config = config
         self.entities = {}  # Dict des entités dans le monde
         self.visible_chunks = set()  # Suivi des chunks actuellement visibles
         self.recent_chunks = {}  # Suivi des chunks récemment visibles
         self.chunk_cache_duration = config.get('chunk_cache_duration', 10)  # Durée de vie des chunks récents (par défaut 10 cycles)
+        
     
     def unload_chunks_outside_view(self, left_bound, right_bound, top_bound, bottom_bound):
         """Décharge les chunks qui sont hors de la zone visible de la caméra après un délai."""
@@ -125,7 +122,7 @@ class World:
         
         # Vérifier la présence des entités sur les tuiles
         self.entity_is_not_present()
-    
+   
     def search_for_entities(self, x, y, radius, entity_type):
         """Recherche des entités dans un rayon donné autour des coordonnées (x, y)."""
         entities_in_radius = []
@@ -409,6 +406,34 @@ def display_entity_info(entity, camera):
     camera.screen.blit(text, (10, 10))
     pygame.display.flip()
 
+def generate_food_in_world(world, max_food_per_chunk=5):
+    for chunk in world.loaded_chunks.values():
+        for tiles in chunk.tiles:
+            for tile in tiles:
+                food_count = sum(1 for tile in tiles if isinstance(tile.has_entity, Food))
+                if food_count >= max_food_per_chunk:
+                    continue
+                if tile.biome == "Forest" and random.random() < 0.0001 and not tile.has_entity:
+                    fruit = Food("Pomme", nutrition_value=20, x=tile.x, y=tile.y, world=world)
+                    tile.set_entity_presence(fruit)
+                    world.add_entity(fruit)
+                    print(f"Une pomme a été ajoutée à la tuile {tile.x}, {tile.y}.")
+                    return
+
+def generate_animals_in_world(world, max_animals_per_chunk=1):
+    for chunk in world.loaded_chunks.values():
+        for tiles in chunk.tiles:
+            for tile in tiles:
+                animal_count = sum(1 for tile in tiles if isinstance(tile.has_entity, Animal))
+                if animal_count >= max_animals_per_chunk:
+                    continue
+                if tile.biome == "Plains" and random.random() < 0.0001 and not tile.has_entity:
+                    animal = Animal("vache",x=tile.x, y=tile.y, world=world)
+                    tile.set_entity_presence(animal)
+                    world.add_entity(animal)
+                    print(f"Un animal a été ajouté à la tuile {tile.x}, {tile.y}.")
+                    return
+
 def main():
     # Charger la configuration
     config = load_config('config.json')
@@ -421,30 +446,25 @@ def main():
     camera = Camera(world, config, mode="free")
 
     # Ajouter des PNJ avec des tailles var  iables
-    pnj1 = PNJ(10, 10, world, config, id=world.generate_id(), size=1.6)  # 1.6 mètres
-    pnj2 = PNJ(12, 10, world, config, id=world.generate_id(),size=1.8)  # 1.8 mètres
+    pnj1 = PNJ(5, 10, world, config, id=world.generate_id(), size=1.6)  # 1.6 mètres
+    pnj2 = PNJ(12, 15, world, config, id=world.generate_id(),size=1.8)  # 1.8 mètres
     #pnj1.set_target(50, 50)  # Le PNJ doit se rendre aux coordonnées (50, 50)
     world.add_entity(pnj1)
     world.add_entity(pnj2)
     
-    # Ajouter des animaux
-    animal1 = Animal(20, 20, world, config,id=world.generate_id())
-    animal2 = Animal(22, 20, world, config,id=world.generate_id())
-    world.add_entity(animal1)
-    world.add_entity(animal2)
-    animal2.generate_random_path(10,49)  # Générer un chemin aléatoire pour l'animal 2
     
-    # # Ajouter des arbres
-    # arbre1 = Arbre(30, 30, world, config, id=world.generate_id())
-    # arbre2 = Arbre(32, 30, world, config, id=world.generate_id())
-    # world.add_entity(arbre1)
-    # world.add_entity(arbre2)
 
     # Boucle principale de simulation
     clock = pygame.time.Clock()
     running = True
     while running:
         delta_time = clock.tick(60) / 1000.0  # 60 FPS, delta_time en secondes
+
+        # Ajouter des animaux
+        generate_animals_in_world(world)
+        
+        # Ajouter de la nourriture
+        generate_food_in_world(world)
 
         # Mise à jour des PNJ
         world.update_entities(delta_time)

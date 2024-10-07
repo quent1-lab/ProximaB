@@ -91,3 +91,6 @@ class Chunk:
             return biome1
         else:
             return biome2
+    
+    def __str__(self) -> str:
+        return f"Chunk at {self.x_offset}, {self.y_offset}"

@@ -104,7 +104,7 @@ class PNJ(Entity):
         else:
             print(f'{self} ne trouve pas d\'eau proche.')
 
-    def search_food(self):
+    def find_food(self):
         """Cherche la nourriture la plus proche."""
         closest_food = self.find_closest_resource('Food')  # Recherche la ressource 'Food'
         # Vérifier si la ressource est juste à côté
