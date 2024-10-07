@@ -190,7 +190,11 @@ class PNJ(Entity):
                 super().move(delta_time)
             
             if math.isclose(self.x, next_pos[0], abs_tol=0.1) and math.isclose(self.y, next_pos[1], abs_tol=0.1):
-                self.path.pop(0)
+                last_tile = self.path.pop(0)
+                if len(self.path) == 0:
+                    self.target = None
+                    # Indiquer que la case n'est plus la destination d'un PNJ
+                    self.world.get_tile_at(*last_tile).set_entity_destination(None)
     
     def __str__(self) -> str:
         return super().__str__() + f" PNJ {self.id}"

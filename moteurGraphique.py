@@ -116,8 +116,15 @@ class World:
     def update_entities(self, delta_time):
         """Met à jour toutes les entités du monde."""
         for entity_type, entity_list in self.entities.items():
+            self.tiles_with_entities = []  # Liste des tuiles ayant des entités
             for entity in entity_list:
                 entity.update(delta_time)
+        
+        # Vérifier la présence des entités sur les tuiles
+        self.entity_is_present()
+        
+        # Vérifier la présence des entités sur les tuiles
+        self.entity_is_not_present()
     
     def search_for_entities(self, x, y, radius, entity_type):
         """Recherche des entités dans un rayon donné autour des coordonnées (x, y)."""
@@ -182,14 +189,29 @@ class World:
         for entity_type, entity_list in self.entities.items():
             for entity in entity_list:
                 tile = self.get_tile_at(entity.x, entity.y)
-                tile.set_entity_presence(True)
+                self.add_entity_to_tile(tile)
         
     def entity_is_not_present(self):
-        """Met à jour la présence d'une entité sur une tuile."""
-        for tile in [t for t in self.tiles if t.has_entity]:
-            # Si l'entité n'est plus sur la tuile, mettre à jour la présence
-            if not tile.has_entity.is_at(tile.x, tile.y):
+        """Met à jour la présence d'une entité sur les tuiles spécifiques où une entité était présente."""
+        # Parcourir seulement les tuiles ayant des entités
+        for tile in self.tiles_with_entities[:]:  # [:] pour éviter la modification de la liste pendant l'itération
+            if tile.has_entity:
+                # Mettre à jour la présence de l'entité
                 tile.set_entity_presence(False)
+                # Retirer la tuile de la liste une fois l'entité disparue
+                self.tiles_with_entities.remove(tile)
+
+    def add_entity_to_tile(self, tile):
+        """Ajoute une entité à une tuile et l'enregistre dans la liste."""
+        tile.set_entity_presence(True)
+        if tile not in self.tiles_with_entities:
+            self.tiles_with_entities.append(tile)
+
+    def remove_entity_from_tile(self, tile):
+        """Retire une entité d'une tuile."""
+        tile.set_entity_presence(False)
+        if tile in self.tiles_with_entities:
+            self.tiles_with_entities.remove(tile)
         
     
 class Camera:
