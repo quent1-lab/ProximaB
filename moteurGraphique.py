@@ -22,7 +22,7 @@ class PerlinNoiseGenerator:
     
 class World:
     """Classe gérant le monde et les chunks générés."""
-    def __init__(self, config):
+    def __init__(self, config, **kwargs):
         self.noise_generator = PerlinNoiseGenerator(config)
         self.loaded_chunks = {}  # Dictionnaire stockant les chunks chargés
         self.tiles_with_entities = []  # Liste des tuiles ayant des entités
@@ -31,6 +31,10 @@ class World:
         self.visible_chunks = set()  # Suivi des chunks actuellement visibles
         self.recent_chunks = {}  # Suivi des chunks récemment visibles
         self.chunk_cache_duration = config.get('chunk_cache_duration', 10)  # Durée de vie des chunks récents (par défaut 10 cycles)
+        
+        self.__dict__.update(kwargs)
+        self.chunk_lock = self.__dict__.get("chunk_lock", None)
+        self.entity_lock = self.__dict__.get("entity_lock", None)
         
     
     def unload_chunks_outside_view(self, left_bound, right_bound, top_bound, bottom_bound):
@@ -147,7 +151,7 @@ class World:
         """Retourne un chunk, le génère si nécessaire."""
         if (chunk_x, chunk_y) not in self.loaded_chunks:
             # Générer et stocker le chunk s'il n'existe pas encore
-            self.loaded_chunks[(chunk_x, chunk_y)] = Chunk(chunk_x * self.config['chunk_size'], chunk_y * self.config['chunk_size'], self.noise_generator, self.config)
+            self.loaded_chunks[(chunk_x, chunk_y)] = Chunk(chunk_x * self.config['chunk_size'], chunk_y * self.config['chunk_size'], self.noise_generator, self.config, chunk_lock=self.chunk_lock, entity_lock=self.entity_lock)
         return self.loaded_chunks[(chunk_x, chunk_y)]
     
     def get_chunks_around(self,x,y,radius):
@@ -354,150 +358,3 @@ class Camera:
     def render_pnj(self, screen_x, screen_y):
         """Affiche un PNJ avec un décalage par rapport à la caméra."""
         pygame.draw.circle(self.screen, (255, 0, 0), (screen_x, screen_y), int(self.scale // 2))
-
-def handle_entity_hover_and_click(world, camera):
-    """Gère le survol des entités par la souris et l'affichage des données de l'entité survolée."""
-    mouse_x, mouse_y = pygame.mouse.get_pos()
-
-    # Convertir la position de la souris en coordonnées du monde
-    world_mouse_x = (mouse_x / camera.scale) + camera.world_offset_x
-    world_mouse_y = (mouse_y / camera.scale) + camera.world_offset_y
-
-    hovered_entity = None
-
-    # Parcourir toutes les entités pour vérifier si la souris survole l'une d'elles
-    for entity_type, entity_list in world.entities.items():
-        for entity in entity_list:
-            # Vérifier si la souris est sur l'entité
-            if entity.x - entity.size / 2 <= world_mouse_x <= entity.x + entity.size / 2 and entity.y - entity.size / 2 <= world_mouse_y <= entity.y + entity.size / 2:
-                hovered_entity = entity
-                break  # On peut sortir si une entité est trouvée
-
-    # Si une entité est survolée, afficher ses informations en haut à gauche
-    if hovered_entity :
-        display_entity_info(hovered_entity, camera)
-
-        # Si un clic gauche est détecté, centrer la caméra sur l'entité
-        if pygame.mouse.get_pressed()[0]:
-            camera.mode = "follow"
-            camera.set_mode("follow", target_pnj=hovered_entity)
-            
-    if camera.mode == "follow":
-        display_entity_info(camera.target_pnj, camera)
-        
-        # Si un clic droit est détecté, arrêter de suivre le PNJ
-        if pygame.mouse.get_pressed()[2]:
-            camera.mode = "free"
-
-def display_entity_info(entity, camera):
-    """Affiche les informations d'une entité survolée."""
-    name = entity.__class__.__name__
-    info = f"{name} at ({entity.x:.2f}, {entity.y:.2f})"
-    
-    # Récupérer dynamiquement tous les attributs potentiels comme énergie, faim, soif, etc.
-    attributes = ["energy", "hunger", "thirst"]
-    for attr in attributes:
-        value = getattr(entity, attr, None)
-        if value is not None:
-            info += f" | {attr.capitalize()}: {value:.2f}"
-    # Afficher les informations
-    font = pygame.font.Font(None, 24)
-    text = font.render(info, True, (255, 255, 255))
-    camera.screen.blit(text, (10, 10))
-    pygame.display.flip()
-
-def generate_food_in_world(world, max_food_per_chunk=5):
-    for chunk in world.loaded_chunks.values():
-        for tiles in chunk.tiles:
-            for tile in tiles:
-                food_count = sum(1 for tile in tiles if isinstance(tile.has_entity, Food))
-                if food_count >= max_food_per_chunk:
-                    continue
-                if tile.biome == "Forest" and random.random() < 0.0001 and not tile.has_entity:
-                    fruit = Food("Pomme", nutrition_value=20, x=tile.x, y=tile.y, world=world)
-                    tile.set_entity_presence(fruit)
-                    world.add_entity(fruit)
-                    print(f"Une pomme a été ajoutée à la tuile {tile.x}, {tile.y}.")
-                    return
-
-def generate_animals_in_world(world, max_animals_per_chunk=1):
-    for chunk in world.loaded_chunks.values():
-        for tiles in chunk.tiles:
-            for tile in tiles:
-                animal_count = sum(1 for tile in tiles if isinstance(tile.has_entity, Animal))
-                if animal_count >= max_animals_per_chunk:
-                    continue
-                if tile.biome == "Plains" and random.random() < 0.0001 and not tile.has_entity:
-                    animal = Animal("vache",x=tile.x, y=tile.y, world=world)
-                    tile.set_entity_presence(animal)
-                    world.add_entity(animal)
-                    print(f"Un animal a été ajouté à la tuile {tile.x}, {tile.y}.")
-                    return
-
-def main():
-    # Charger la configuration
-    config = load_config('config.json')
-    
-    # Initialiser Pygame
-    pygame.init()
-
-    # Créer le monde et la caméra
-    world = World(config)
-    camera = Camera(world, config, mode="free")
-
-    # Ajouter des PNJ avec des tailles var  iables
-    pnj1 = PNJ(5, 10, world, config, id=world.generate_id(), size=1.6)  # 1.6 mètres
-    pnj2 = PNJ(12, 15, world, config, id=world.generate_id(),size=1.8)  # 1.8 mètres
-    #pnj1.set_target(50, 50)  # Le PNJ doit se rendre aux coordonnées (50, 50)
-    world.add_entity(pnj1)
-    world.add_entity(pnj2)
-    
-    
-
-    # Boucle principale de simulation
-    clock = pygame.time.Clock()
-    running = True
-    while running:
-        delta_time = clock.tick(60) / 1000.0  # 60 FPS, delta_time en secondes
-
-        # Ajouter des animaux
-        generate_animals_in_world(world)
-        
-        # Ajouter de la nourriture
-        generate_food_in_world(world)
-
-        # Mise à jour des PNJ
-        world.update_entities(delta_time)
-        
-        # Changer le mode de la caméra selon l'input
-        keys = pygame.key.get_pressed()
-        if keys[pygame.K_KP1] and camera.mode != "fixed":
-            print("Mode fixe")
-            camera.set_mode("fixed")
-        elif keys[pygame.K_KP2] and camera.mode != "free":
-            print("Mode libre")
-            camera.set_mode("free")
-        elif keys[pygame.K_KP3] and camera.mode != "follow":
-            print("Mode follow")
-            camera.set_mode("follow", target_pnj=pnj1)
-        
-        # Mise à jour de la caméra
-        camera.update(delta_time)
-        
-        
-        # Rendu de la caméra
-        camera.render()
-        
-        # Gérer le survol des entités par la souris
-        handle_entity_hover_and_click(world, camera)
-
-        # Gérer les événements (fermeture de la fenêtre, etc.)
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
-                running = False
-
-    pygame.quit()
-
-if __name__ == "__main__":
-    main()
-
