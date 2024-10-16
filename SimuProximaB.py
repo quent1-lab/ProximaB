@@ -180,15 +180,17 @@ class Simulation:
         """Lancer les threads pour chaque module."""
         threading.Thread(target=self.update_entities, daemon=True).start()
         #threading.Thread(target=self.update_chunks, daemon=True).start()
-        threading.Thread(target=self.update_display, daemon=True).start()
+        #threading.Thread(target=self.update_display, daemon=True).start()
+        
+        self.run_pygame()
 
     def update_entities(self):
         """Gérer la mise à jour des entités (par exemple, besoins vitaux)."""
         while self.is_running:
             with entity_lock:
                 self.world.update_entities(self.delta_time)
-            time.sleep(self.delta_time) # Cycle rapide pour les entités
-        pygame.quit()
+                print("Updating entities...")
+            time.sleep(0.01) # Cycle rapide pour les entités
 
     def update_chunks(self):
         """Mettre à jour les chunks (par exemple, génération de nouveaux biomes)."""
@@ -201,10 +203,37 @@ class Simulation:
     def update_display(self):
         """Mettre à jour le rendu graphique."""
         while self.is_running:
+            # Gérer les événements (fermeture de la fenêtre, etc.)
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
+                    self.is_running = False
+
             self.camera.update(self.delta_time)
             self.camera.render()
+            
             time.sleep(self.delta_time)  # 60 FPS
+        pygame.quit()
 
+    def run_pygame(self):
+        """Boucle principale de Pygame (doit être exécutée dans le thread principal)."""
+        
+        while self.is_running:
+            # Gestion des événements Pygame
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE):
+                    self.stop_simulation()
+
+            # Gérer le survol des entités par la souris
+            handle_entity_hover_and_click(self.world, self.camera)
+            
+            self.camera.update(self.delta_time)  # Mise à jour de la caméra
+            self.camera.render()
+
+            # Ajuster la vitesse de rendu (par ex., 60 FPS)
+            time.sleep(1/60)
+
+        pygame.quit()
+    
     def stop_simulation(self):
         """Arrêter la simulation."""
         self.is_running = False
@@ -223,10 +252,6 @@ def main2():
     sim = Simulation(world, camera)
     sim.initialize_simulation()
     sim.start_simulation()
-    
-    time.sleep(100)
-    # Plus tard, si tu veux arrêter la simulation proprement :
-    sim.stop_simulation()
 
 if __name__ == "__main__":
     main2()
