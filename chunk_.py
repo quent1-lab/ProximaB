@@ -27,13 +27,11 @@ class Tile:
             self.grass_quantity = self.config.get("initial_grass_quantity", 100)
 
     def set_entity_presence(self, entity_present):
-        with self.entity_lock:  # Protéger les accès concurrents aux entités
-            self.has_entity = entity_present
+        self.has_entity = entity_present
 
     def set_entity_destination(self, entity):
-        with self.entity_lock:
-            print(f"Entity {entity} is now moving to tile {self.x}, {self.y}")
-            self.entity_destination = entity
+        print(f"Entity {entity} is now moving to tile {self.x}, {self.y}")
+        self.entity_destination = entity
 
     def update_grass_quantity(self, amount):
         with self.chunk_lock:  # Protéger l'accès aux données des chunks

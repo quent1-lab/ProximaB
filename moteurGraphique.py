@@ -261,7 +261,6 @@ class Camera:
             # Suivre la position du PNJ
             self.world_offset_x = self.target_pnj.x - self.camera_center_x / self.scale
             self.world_offset_y = self.target_pnj.y - self.camera_center_y / self.scale
-            self.update_chunks()
 
         # Toujours s'assurer que les chunks sont chargés après mise à jour de la caméra
         self.update_chunks()
@@ -305,7 +304,7 @@ class Camera:
         self.screen.fill((135, 206, 235))  # Fond bleu ciel
 
         # Afficher les chunks
-        for chunk_coords, chunk in self.world.loaded_chunks.items():
+        for chunk in list(self.world.loaded_chunks.values()):
             self.render_chunk(chunk)
 
         # Afficher les PNJ

@@ -1,4 +1,4 @@
-import pygame, random, json
+import pygame, random, json, threading, time
 from moteurGraphique import Camera, World
 from entity import Food, Animal
 from PNJ import PNJ
@@ -152,9 +152,6 @@ def main():
 
     pygame.quit()
     
-    
-import threading
-import time
 # Gestion des verrous pour éviter les conflits sur les accès aux données partagées
 chunk_lock = threading.Lock()
 entity_lock = threading.Lock()
@@ -189,7 +186,6 @@ class Simulation:
         while self.is_running:
             with entity_lock:
                 self.world.update_entities(self.delta_time)
-                print("Updating entities...")
             time.sleep(0.01) # Cycle rapide pour les entités
 
     def update_chunks(self):
