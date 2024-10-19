@@ -36,13 +36,13 @@ class PNJ(Entity):
     def perform_tasks(self, delta_time):
         """Effectue les tâches en fonction des besoins."""
         if self.hunger < 20 and not self.target_food:
-            print(f'{self} a faim...')
+            # print(f'{self} a faim...')
             self.search_food()
         elif self.thirst < 90 and not self.target_water: 
-            print(f'{self} a soif...')
+            # print(f'{self} a soif...')
             self.search_water()
         elif self.energy < 30:
-            print(f'{self} est fatigué...')
+            # print(f'{self} est fatigué...')
             self.rest()
     
     def search_water(self):
@@ -76,12 +76,12 @@ class PNJ(Entity):
 
     def drink_water(self, pnj, delta_time):
         """Action pour boire de l'eau."""
-        print(f"{pnj} boit de l'eau.")
+        # print(f"{pnj} boit de l'eau.")
         self.thirst += 20 * delta_time  # Régénération de la soif
         self.energy -= delta_time * 0.1  # Coût de l'effort pour boire
         
         if self.thirst >= 100:
-            print(f'{self} est hydraté.')
+            # print(f'{self} est hydraté.')
             self.target_water = None
             self.task_manager.current_task.complete()  # Marquer la tâche comme complétée
           
@@ -137,19 +137,19 @@ class PNJ(Entity):
     
     def eat(self):
         """Mange de la nourriture pour récupérer de la faim."""
-        print(f'{self} mange...')
+        # print(f'{self} mange...')
         self.hunger += 20  # Régénération de la faim
             
     def rest(self):
         """Récupère de l'énergie en se reposant."""
-        print(f'{self} se repose...')
+        # print(f'{self} se repose...')
         self.energy += 10  # Régénération de l'énergie
     
     def collaborate(self, other_pnj):
         """Collabore avec un autre PNJ."""
         if other_pnj not in self.collaborators:
             self.collaborators.append(other_pnj)
-            print(f'{self} collabore avec {other_pnj}.')
+            # print(f'{self} collabore avec {other_pnj}.')
             # Partager des tâches ou des ressources
     
     def find_closest_resource(self, resource_type):
@@ -196,7 +196,7 @@ class PNJ(Entity):
             if math.isclose(self.x, next_pos[0], abs_tol=0.1) and math.isclose(self.y, next_pos[1], abs_tol=0.1):
                 last_tile = self.path.pop(0)
                 if len(self.path) == 0:
-                    print(f'{self} est arrivé à destination.')
+                    # print(f'{self} est arrivé à destination.')
                     self.target = None
                     # Indiquer que la case n'est plus la destination d'un PNJ
                     self.world.get_tile_at(*last_tile).set_entity_destination(None)

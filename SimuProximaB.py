@@ -58,7 +58,7 @@ def display_entity_info(entity, camera):
     font = pygame.font.Font(None, 24)
     text = font.render(info, True, (255, 255, 255))
     camera.screen.blit(text, (10, 10))
-    pygame.display.flip()
+    #pygame.display.flip()
 
 def generate_food_in_world(world, max_food_per_chunk=5):
     for chunk in world.loaded_chunks.values():
@@ -194,20 +194,6 @@ class Simulation:
                     chunk.update_tiles()  # Par exemple, mise à jour de l'herbe ou des biomes
             time.sleep(1)  # Cycle plus lent car les chunks n'ont pas besoin de mises à jour rapides
 
-    def update_display(self):
-        """Mettre à jour le rendu graphique."""
-        while self.is_running:
-            # Gérer les événements (fermeture de la fenêtre, etc.)
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
-                    self.is_running = False
-
-            self.camera.update(self.delta_time)
-            self.camera.render()
-            
-            time.sleep(self.delta_time)  # 60 FPS
-        pygame.quit()
-
     def run_pygame(self):
         """Boucle principale de Pygame (doit être exécutée dans le thread principal)."""
         
@@ -217,14 +203,17 @@ class Simulation:
                 if event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE):
                     self.stop_simulation()
 
-            # Gérer le survol des entités par la souris
-            handle_entity_hover_and_click(self.world, self.camera)
+            
             
             self.camera.update(self.delta_time)  # Mise à jour de la caméra
             self.camera.render()
-
+            
+            # Gérer le survol des entités par la souris
+            handle_entity_hover_and_click(self.world, self.camera)
+            
+            pygame.display.flip()
             # Ajuster la vitesse de rendu (par ex., 60 FPS)
-            time.sleep(1/60)
+            time.sleep(self.delta_time)
 
         pygame.quit()
     

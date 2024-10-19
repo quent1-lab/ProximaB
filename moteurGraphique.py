@@ -305,16 +305,34 @@ class Camera:
             self.render_chunk(chunk)
 
         # Afficher les PNJ
-        for entity_type, entity_list in self.world.entities.items():
+        for entity_list in self.world.entities.values():
             for entity in entity_list:
                 screen_x = int((entity.x - self.world_offset_x) * self.scale)
                 screen_y = int((entity.y - self.world_offset_y) * self.scale)
                 entity.render(self.screen, self.scale, screen_x, screen_y)
+        
+        # Dessiner le chemin du PNJ
+        for pnj in self.world.entities['PNJ']:
+            for i in range(len(pnj.path)):
+                if i == 0:
+                    start_x, start_y = pnj.x, pnj.y
+                else:
+                    start_x, start_y = pnj.path[i - 1]
+                end_x, end_y = pnj.path[i]
+                pygame.draw.line(self.screen, (255, 0, 0), 
+                                 ((start_x - self.world_offset_x) * self.scale, (start_y - self.world_offset_y) * self.scale),
+                                 ((end_x - self.world_offset_x) * self.scale, (end_y - self.world_offset_y) * self.scale))
+        
+        # Ecriture du nombre de chunks chargés
+        font = pygame.font.Font(None, 24)
+        text = font.render(f"Chunks loaded: {len(self.world.loaded_chunks)}", True, (255, 255, 255))
+        self.screen.blit(text, (10, 40))
 
-        pygame.display.flip()
-
-    def render_chunk(self, chunk):
+    def render_chunk(self, chunk, *args):
         """Affiche un chunk avec déplacement en fonction de la caméra."""
+        
+        draw_chunk = args[0] if args else False            
+        
         for x in range(chunk.chunk_size):
             for y in range(chunk.chunk_size):
                 tile_type = chunk.tiles[x][y].biome
@@ -330,26 +348,13 @@ class Camera:
 
                 pygame.draw.rect(self.screen, color, pygame.Rect(screen_x, screen_y, self.scale, self.scale))
 
-        # Afficher les bordures des chunks
-        chunk_border_color = (255, 255, 255)
-        pygame.draw.rect(self.screen, chunk_border_color, 
-                         pygame.Rect((chunk.x_offset - self.world_offset_x) * self.scale, 
-                                     (chunk.y_offset - self.world_offset_y) * self.scale, 
-                                     chunk.chunk_size * self.scale, chunk.chunk_size * self.scale), 1)
-
-        # Dessiner le chemin du PNJ
-        for pnj in self.world.entities['PNJ']:
-            for i in range(len(pnj.path)):
-                start_x, start_y = pnj.x, pnj.y
-                end_x, end_y = pnj.path[i]
-                pygame.draw.line(self.screen, (255, 0, 0), 
-                                 ((start_x - self.world_offset_x) * self.scale, (start_y - self.world_offset_y) * self.scale),
-                                 ((end_x - self.world_offset_x) * self.scale, (end_y - self.world_offset_y) * self.scale))
-        
-        # Ecriture du nombre de chunks chargés
-        font = pygame.font.Font(None, 24)
-        text = font.render(f"Chunks loaded: {len(self.world.loaded_chunks)}", True, (255, 255, 255))
-        self.screen.blit(text, (10, 40))
+        if draw_chunk:
+            # Afficher les bordures des chunks
+            chunk_border_color = (255, 255, 255)
+            pygame.draw.rect(self.screen, chunk_border_color, 
+                            pygame.Rect((chunk.x_offset - self.world_offset_x) * self.scale, 
+                                        (chunk.y_offset - self.world_offset_y) * self.scale, 
+                                        chunk.chunk_size * self.scale, chunk.chunk_size * self.scale), 1)
 
     def render_pnj(self, screen_x, screen_y):
         """Affiche un PNJ avec un décalage par rapport à la caméra."""
