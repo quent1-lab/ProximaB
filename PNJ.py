@@ -1,6 +1,6 @@
 from entity import Entity, Pathfinding
 from task import Task, TaskManager
-import math
+import math, threading
 
 class PNJ(Entity):
     """Classe représentant un PNJ."""
@@ -174,7 +174,11 @@ class PNJ(Entity):
     def set_target(self, target_x, target_y):
         """Définit une cible pour le PNJ et calcule le chemin."""
         self.target = (target_x, target_y)
-        self.path = self.pathfinder.a_star((self.x, self.y), self.target)
+        threading.Thread(target=self.pathfinder.a_star, args=((self.x, self.y), self.target, self.set_path)).start()
+    
+    def set_path(self, path):
+        """Définit un chemin pour le PNJ."""
+        self.path = path
 
     def move(self, delta_time):
         """Déplace le PNJ vers la cible."""
