@@ -1,7 +1,4 @@
-import random
-import pygame
-import math
-import heapq
+import random, pygame, math, heapq
 
 class Entity:
     """Classe représentant une entité générique dans le monde."""

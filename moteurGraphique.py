@@ -1,6 +1,4 @@
-import json , random, pygame, uuid, perlin_noise, numpy as np
-from entity import Animal, Food
-from PNJ import PNJ
+import json, pygame, uuid, perlin_noise, numpy as np
 from chunk_ import Chunk
 
 # Charger la configuration depuis un fichier JSON
@@ -8,6 +6,10 @@ def load_config(file_path):
     with open(file_path, 'r') as f:
         config = json.load(f)
     return config
+
+# ======================================================================================
+# =============================== Class PerlinNoise ====================================
+# ======================================================================================
 
 class PerlinNoiseGenerator:
     """Classe pour générer du bruit de Perlin."""
@@ -19,7 +21,12 @@ class PerlinNoiseGenerator:
         nx = x / chunk_size
         ny = y / chunk_size
         return self.noise([nx, ny])
-    
+
+# ======================================================================================
+# ================================= Class WORLD ========================================
+# ======================================================================================
+
+
 class World:
     """Classe gérant le monde et les chunks générés."""
     def __init__(self, config, **kwargs):
@@ -36,7 +43,6 @@ class World:
         self.chunk_lock = self.__dict__.get("chunk_lock", None)
         self.entity_lock = self.__dict__.get("entity_lock", None)
         
-    
     def unload_chunks_outside_view(self, left_bound, right_bound, top_bound, bottom_bound):
         """Décharge les chunks qui sont hors de la zone visible de la caméra après un délai."""
         chunk_size = self.config['chunk_size']
@@ -73,10 +79,6 @@ class World:
         for chunk_coords in chunks_to_unload:
             if chunk_coords in self.loaded_chunks:
                 del self.loaded_chunks[chunk_coords]  # Décharger le chunk
-
-    def generate_tiles(self):
-        """Génère les tuiles du chunk (placeholder, remplacez par votre logique de génération)."""
-        return [[0 for _ in range(self.world.config['chunk_size'])] for _ in range(self.world.config['chunk_size'])]
     
     def get_tile_at(self, x, y):
         """Retourne le type de terrain pour les coordonnées globales (x, y)."""
@@ -101,14 +103,6 @@ class World:
             for i, entity in enumerate(entity_list):
                 if entity.id == entity_id:
                     del entity_list[i]
-    
-    def get_entity(self, entity_id):
-        """Retourne une entité par son ID."""
-        for entity_type, entity_list in self.entities.items():
-            for entity in entity_list:
-                if entity.id == entity_id:
-                    return entity
-        return None
     
     def generate_id(self):
         """Génère un ID unique pour une entité."""
@@ -213,8 +207,11 @@ class World:
         tile.set_entity_presence(False)
         if tile in self.tiles_with_entities:
             self.tiles_with_entities.remove(tile)
-        
-    
+
+# ======================================================================================
+# ================================= Class CAMERA =======================================
+# ======================================================================================
+
 class Camera:
     """Classe gérant la caméra comme entité invisible et fixe, les chunks se déplacent autour d'elle."""
     def __init__(self, world, config, mode="free", start_x=0, start_y=0):

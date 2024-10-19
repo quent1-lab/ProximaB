@@ -106,8 +106,6 @@ def main():
     world.add_entity(pnj1)
     world.add_entity(pnj2)
     
-    
-
     # Boucle principale de simulation
     clock = pygame.time.Clock()
     running = True
