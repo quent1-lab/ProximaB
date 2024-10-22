@@ -1,25 +1,35 @@
 class Task:
     """Représente une tâche générique pour toute entité."""
-    def __init__(self, name, action, priority, energy_cost, linked_tasks=None):
+    def __init__(self, name, action, priority, energy_cost, *args, **kwargs):
         self.name = name
         self.action = action  # Fonction/action à exécuter pour accomplir la tâche
         self.priority = priority  # Priorité de la tâche (plus élevé = plus prioritaire)
         self.energy_cost = energy_cost  # Coût en énergie de la tâche
-        self.linked_tasks = linked_tasks if linked_tasks else []  # Autres tâches liées
+        self.args = args
+        self.kwargs = kwargs
+        self.linked_tasks = []
         self.completed = False
         self.interrupted = False
 
     def execute(self, entity, delta_time):
         """Exécute la tâche pour une entité donnée."""
-        entity.energy -= self.energy_cost * delta_time
+        if entity.needs["energy"] < self.energy_cost * delta_time:
+            print(f"{entity} n'a pas assez d'énergie pour effectuer la tâche {self.name}.")
+            self.interrupted = True
+            return
+
+        # Déduction d'énergie et exécution de l'action
+        entity.needs["energy"] -= self.energy_cost * delta_time
         if self.action:
-            self.action(entity,delta_time)  # Exécuter l'action associée à la tâche
-            if self.energy_cost > entity.energy:
-                print(f"{entity} n'a pas assez d'énergie pour effectuer la tâche.")
-                self.interrupted = True
-                return
-            if self.completed:
-                return
+            params = (delta_time,) + self.args if self.args else (delta_time,)
+            #traitement des arguments kwargs
+            if self.kwargs:
+                self.action(*params, **self.kwargs)
+            else:
+                self.action(*params)
+
+        if self.completed:
+            print(f"{entity} a terminé la tâche {self.name}.")
     
     def complete(self):
         """Marque la tâche comme complétée."""
@@ -42,16 +52,26 @@ class TaskManager:
         for i in range(len(tasks) - 1):
             tasks[i].linked_tasks.append(tasks[i + 1])
         self.add_task(tasks[0])  # Ajouter la première tâche du groupe à la liste
+        #print(f"liste des tâches: {self.tasks}")
+
+    def is_busy(self):
+        """Retourne True si une tâche est en cours, False sinon."""
+        return self.current_task is not None or bool(self.tasks)
+    
+    def set_task_completed(self):
+        """Marque la tâche actuelle comme complétée."""
+        if self.current_task:
+            self.current_task.complete()
 
     def execute_tasks(self, delta_time):
         """Exécute la tâche actuelle de l'entité."""
         if not self.tasks:
             return
 
-        # Exécuter la première tâche de la liste
+        # Si aucune tâche n'est en cours, on prend la première tâche disponible
         if not self.current_task:
-            print(f"{self.entity} commence la tâche: {self.tasks[0].name}")
             self.current_task = self.tasks[0]
+            print(f"{self.entity} commence la tâche: {self.current_task.name}")
         else:
             if self.current_task.interrupted:
                 print(f"{self.entity} a été interrompu dans la tâche: {self.current_task.name}")
@@ -59,16 +79,19 @@ class TaskManager:
                 self.current_task = None
                 return
         
-        self.current_task.execute(self.entity, delta_time)
-
+        # Si la tâche est terminée, passe à la suivante
         if self.current_task.completed:
-            print(f"{self.entity} a terminé la tâche: {self.current_task.name}")
             if self.current_task.linked_tasks:
-                # Ajouter la tâche liée suivante
-                print(f"{self.entity} commence la tâche liée: {self.current_task.linked_tasks[0].name}")
+                # Ajoute la prochaine tâche liée
                 self.tasks.insert(1, self.current_task.linked_tasks.pop(0))
-                self.current_task = None
             self.tasks.pop(0)  # Retirer la tâche terminée
-            
+            self.current_task = None
+
+        # Si plus aucune tâche n'est présente
         if not self.tasks:
             self.current_task = None
+            return
+        
+        if self.current_task:
+            # Exécute la tâche courante
+            self.current_task.execute(self.entity, delta_time)

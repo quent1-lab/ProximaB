@@ -20,7 +20,7 @@ def handle_entity_hover_and_click(world, camera):
     hovered_entity = None
 
     # Parcourir toutes les entités pour vérifier si la souris survole l'une d'elles
-    for entity_type, entity_list in world.entities.items():
+    for entity_list in world.entities.values():
         for entity in entity_list:
             # Vérifier si la souris est sur l'entité
             if entity.x - entity.size / 2 <= world_mouse_x <= entity.x + entity.size / 2 and entity.y - entity.size / 2 <= world_mouse_y <= entity.y + entity.size / 2:
@@ -49,11 +49,9 @@ def display_entity_info(entity, camera):
     info = f"{name} at ({entity.x:.2f}, {entity.y:.2f})"
     
     # Récupérer dynamiquement tous les attributs potentiels comme énergie, faim, soif, etc.
-    attributes = ["energy", "hunger", "thirst"]
-    for attr in attributes:
-        value = getattr(entity, attr, None)
-        if value is not None:
-            info += f" | {attr.capitalize()}: {value:.2f}"
+    for need, value in entity.needs.items():
+        info += f" {need.capitalize()}: {value:.2f}"
+    
     # Afficher les informations
     font = pygame.font.Font(None, 24)
     text = font.render(info, True, (255, 255, 255))
@@ -203,8 +201,6 @@ class Simulation:
                 if event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE):
                     self.stop_simulation()
 
-            
-            
             self.camera.update(self.delta_time)  # Mise à jour de la caméra
             self.camera.render()
             

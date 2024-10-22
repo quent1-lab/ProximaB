@@ -146,6 +146,10 @@ class World:
         if (chunk_x, chunk_y) not in self.loaded_chunks:
             # Générer et stocker le chunk s'il n'existe pas encore
             self.loaded_chunks[(chunk_x, chunk_y)] = Chunk(chunk_x * self.config['chunk_size'], chunk_y * self.config['chunk_size'], self.noise_generator, self.config, chunk_lock=self.chunk_lock, entity_lock=self.entity_lock)
+            # Ajouter un log pour enregistrer l'appel
+            # print(f"Chunk généré pour ({chunk_x}, {chunk_y})")
+            # print("Appelé par :")
+            # traceback.print_stack(limit=5)  # Limite la profondeur de la pile d'appels affichée
         return self.loaded_chunks[(chunk_x, chunk_y)]
     
     def get_chunks_around(self,x,y,radius):

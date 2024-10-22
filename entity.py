@@ -252,6 +252,7 @@ class Pathfinding:
     def get_cost(self, node):
         """Retourne le coût de déplacement pour une case donnée (en fonction du type de terrain)."""
         tile_type = self.world.get_tile_at(node[0], node[1]).biome
+        
         if tile_type == 'Water':
             return float('inf')  # Infranchissable sans bateau
         elif tile_type == 'Mountains':
@@ -270,13 +271,18 @@ class Pathfinding:
         g_score = {start: 0}
         f_score = {start: self.heuristic(start, goal)}
         callback_set_path = args[0] if args else None
+        path_found = False  # Variable de contrôle pour indiquer que le chemin a été trouvé
 
         while open_set:
             _, current = heapq.heappop(open_set)
             if current == goal:
+                path = self.simplify_path(self.reconstruct_path(came_from, current))
+                if path[0] == start:
+                    path.pop(0)  # Enlève le point de départ
                 if callback_set_path:
-                    callback_set_path(self.simplify_path(self.reconstruct_path(came_from, current)))
-                return self.simplify_path(self.reconstruct_path(came_from, current))
+                    callback_set_path(path)
+                path_found = True  # Indique que le chemin a été trouvé
+                break  # Sort de la boucle
 
             for neighbor in self.get_neighbors(current):
                 tentative_g_score = g_score[current] + self.get_cost(neighbor)
@@ -285,10 +291,11 @@ class Pathfinding:
                     g_score[neighbor] = tentative_g_score
                     f_score[neighbor] = tentative_g_score + self.heuristic(neighbor, goal)
                     heapq.heappush(open_set, (f_score[neighbor], neighbor))
-        
-        if callback_set_path:
-            callback_set_path([])
-        return []  # Pas de chemin trouvé
+
+        if path_found:
+            return path
+        else:
+            return []  # Retourne une liste vide si aucun chemin n'a été trouvé
 
     def reconstruct_path(self, came_from, current):
         """Reconstitue le chemin à partir du point de départ."""
