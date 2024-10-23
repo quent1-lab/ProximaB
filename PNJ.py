@@ -7,6 +7,7 @@ class PNJ(Entity):
     def __init__(self, x, y, world, config, id, size=1.75, speed=1.0):
         super().__init__(x, y, world, config, size, entity_type="PNJ")
         self.id = id
+        self.name = self.init_name()
         self.speed = speed
         self.target = None
         self.pathfinder = Pathfinding(world)
@@ -22,6 +23,11 @@ class PNJ(Entity):
         
         self.collaborators = []  
         self.task_manager = TaskManager(self)
+
+    def init_name(self):
+        """Initialise le nom du PNJ."""
+        entities_pnj = self.world.entities.get('PNJ', [])
+        return f"PNJ {len(entities_pnj) + 1}"
 
     def update(self, delta_time):
         """Met à jour l'état de l'entité et exécute les tâches."""
@@ -106,6 +112,13 @@ class PNJ(Entity):
         if getattr(self, f'target_{self.corresponding_actions[resource_type]}'):
             return
         
+        # Vérifie si sur les cases adjacentes il y a une ressource
+        if self.check_adjacent_tiles_for_resource(resource_type):
+            self.path = [(self.x, self.y)]
+            setattr(self, f'target_{self.corresponding_actions[resource_type]}', (self.x, self.y))
+            print(f"{self} est déjà sur la ressource {resource_type}.")
+            return
+        
         closest_resource = self.find_closest_resource(resource_type)
         if closest_resource:
             adjacent_tile = self.find_adjacent_accessible_tile(closest_resource)
@@ -147,6 +160,22 @@ class PNJ(Entity):
             #     if len(self.path) == 0:
             #         self.target = None
             #         self.world.get_tile_at(*last_tile).set_entity_destination(None)
+    
+    def check_adjacent_tiles_for_resource(self, resource_type):
+        """Vérifie si une ressource est présente dans les cases adjacentes au PNJ."""
+        adjacent_offsets = [(-1, 0), (1, 0), (0, -1), (0, 1),
+                            (-2,0), (2,0), (0,-2), (0,2)]   # Cases adjacentes : droite, gauche, haut, bas
+        
+        for dx, dy in adjacent_offsets:
+            adjacent_x = self.x + dx
+            adjacent_y = self.y + dy
+            tile = self.world.get_tile_at(adjacent_x, adjacent_y)
+            
+            if tile and tile.biome == resource_type:
+                return True
+        
+        return False
+        
     
     def find_closest_resource(self, resource_type):
         """Trouve la ressource la plus proche."""
@@ -191,4 +220,4 @@ class PNJ(Entity):
         self.needs['energy'] += 10
 
     def __str__(self) -> str:
-        return super().__str__() + f" PNJ {self.id}"
+        return super().__str__() + f" {self.name}"

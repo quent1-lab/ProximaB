@@ -99,9 +99,8 @@ def main():
 
     # Ajouter des PNJ avec des tailles var  iables
     pnj1 = PNJ(5, 10, world, config, id=world.generate_id(), size=1.6)  # 1.6 mètres
-    pnj2 = PNJ(12, 15, world, config, id=world.generate_id(),size=1.8)  # 1.8 mètres
-    #pnj1.set_target(50, 50)  # Le PNJ doit se rendre aux coordonnées (50, 50)
     world.add_entity(pnj1)
+    pnj2 = PNJ(12, 15, world, config, id=world.generate_id(),size=1.8)  # 1.8 mètres
     world.add_entity(pnj2)
     
     # Boucle principale de simulation
@@ -164,9 +163,8 @@ class Simulation:
         """Initialiser les entités, les chunks, etc."""
         # Ajouter des entités
         pnj1 = PNJ(5, 10, self.world, self.world.config, id=self.world.generate_id(), size=1.6)
-        pnj2 = PNJ(12, 15, self.world, self.world.config, id=self.world.generate_id(), size=1.8)
-        
         self.world.add_entity(pnj1)
+        pnj2 = PNJ(12, 15, self.world, self.world.config, id=self.world.generate_id(), size=1.8)
         self.world.add_entity(pnj2)
 
     def start_simulation(self):
