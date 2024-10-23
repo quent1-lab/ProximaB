@@ -283,7 +283,7 @@ class Pathfinding:
                     callback_set_path(path)
                 path_found = True  # Indique que le chemin a été trouvé
                 break  # Sort de la boucle
-
+                        
             for neighbor in self.get_neighbors(current):
                 tentative_g_score = g_score[current] + self.get_cost(neighbor)
                 if neighbor not in g_score or tentative_g_score < g_score[neighbor]:
@@ -338,5 +338,10 @@ class Pathfinding:
             if not self.is_line_passable(simplified_path[-1], path[i]):
                 simplified_path.append(path[i - 1])
         simplified_path.append(path[-1])
+        
+        # # Modifie l'arrivée pour atterir au milieu de la case finale
+        # if len(simplified_path) > 1:
+        #     last_node = simplified_path[-1]
+        #     simplified_path[-1] = (last_node[0] + 0.5, last_node[1] + 0.5)
 
         return simplified_path

@@ -305,8 +305,7 @@ class Camera:
         self.screen.fill((135, 206, 235))  # Fond bleu ciel
 
         # Afficher les chunks
-        for chunk in list(self.world.loaded_chunks.values()):
-            self.render_chunk(chunk)
+        self.render_visible_chunks()
 
         # Afficher les PNJ
         for entity_list in self.world.entities.values():
@@ -359,6 +358,32 @@ class Camera:
                             pygame.Rect((chunk.x_offset - self.world_offset_x) * self.scale, 
                                         (chunk.y_offset - self.world_offset_y) * self.scale, 
                                         chunk.chunk_size * self.scale, chunk.chunk_size * self.scale), 1)
+
+    def render_visible_chunks(self):
+        """Affiche uniquement les chunks qui sont dans le champ de la caméra."""
+        # Calculer les limites visibles de la caméra en termes de coordonnées du monde
+        camera_world_x = self.camera_center_x / self.scale + self.world_offset_x
+        camera_world_y = self.camera_center_y / self.scale + self.world_offset_y
+        
+        left_bound = camera_world_x - (self.screen_width / 2) / self.scale
+        right_bound = camera_world_x + (self.screen_width / 2) / self.scale
+        top_bound = camera_world_y - (self.screen_height / 2) / self.scale
+        bottom_bound = camera_world_y + (self.screen_height / 2) / self.scale
+        
+        chunk_size = self.config['chunk_size']
+
+        # Détermine les coordonnées des chunks visibles
+        left_chunk = int(left_bound // chunk_size)
+        right_chunk = int(right_bound // chunk_size)
+        top_chunk = int(top_bound // chunk_size)
+        bottom_chunk = int(bottom_bound // chunk_size)
+
+        # Affiche les chunks visibles
+        for chunk_x in range(left_chunk, right_chunk + 1):
+            for chunk_y in range(top_chunk, bottom_chunk + 1):
+                chunk = self.world.get_chunk(chunk_x, chunk_y)
+                if chunk:
+                    self.render_chunk(chunk)
 
     def render_pnj(self, screen_x, screen_y):
         """Affiche un PNJ avec un décalage par rapport à la caméra."""
