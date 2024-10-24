@@ -263,7 +263,7 @@ class Pathfinding:
             return 1  # Terrain facile
         return 2  # Coût par défaut
 
-    def a_star(self, start, goal, *args):
+    def a_star(self, start, goal, max_iterations=1000, *args):
         """Implémente l'algorithme A* pour trouver le chemin optimal entre start et goal."""
         open_set = []
         heapq.heappush(open_set, (0, start))  # (F, (x, y))
@@ -272,8 +272,10 @@ class Pathfinding:
         f_score = {start: self.heuristic(start, goal)}
         callback_set_path = args[0] if args else None
         path_found = False  # Variable de contrôle pour indiquer que le chemin a été trouvé
+        iterations = 0  # Compteur d'itérations
 
-        while open_set:
+        while open_set and iterations < max_iterations:
+            iterations += 1
             _, current = heapq.heappop(open_set)
             if current == goal:
                 path = self.simplify_path(self.reconstruct_path(came_from, current))

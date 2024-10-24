@@ -175,7 +175,6 @@ class PNJ(Entity):
             adjacent_x = self.x + dx
             adjacent_y = self.y + dy
             tile = self.world.get_tile_at(adjacent_x, adjacent_y)
-            print(f"{self.name} vérifie la case ({adjacent_x}, {adjacent_y}) la tuile est {tile.biome}")
             
             if tile and tile.biome == resource_type:
                 return True
