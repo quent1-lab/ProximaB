@@ -138,6 +138,7 @@ class PNJ(Entity):
         """Définit une cible pour le PNJ et lance le calcul du chemin dans un autre thread."""
         self.target = (target_x, target_y)
         self.path = self.pathfinder.a_star((self.x, self.y), self.target)
+        self.target = (target_x + 0.5, target_y + 0.5)
 
     def set_path(self, path):
         """Définit un chemin pour le PNJ."""
@@ -176,7 +177,6 @@ class PNJ(Entity):
         
         return False
         
-    
     def find_closest_resource(self, resource_type):
         """Trouve la ressource la plus proche."""
         closest_resource, closest_distance = None, float('inf')

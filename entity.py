@@ -339,9 +339,9 @@ class Pathfinding:
                 simplified_path.append(path[i - 1])
         simplified_path.append(path[-1])
         
-        # # Modifie l'arrivée pour atterir au milieu de la case finale
-        # if len(simplified_path) > 1:
-        #     last_node = simplified_path[-1]
-        #     simplified_path[-1] = (last_node[0] + 0.5, last_node[1] + 0.5)
+        # Modifie l'arrivée pour atterir au milieu de la case finale
+        if len(simplified_path) > 1:
+            last_node = simplified_path[-1]
+            simplified_path[-1] = (last_node[0] + 0.5, last_node[1] + 0.5)
 
         return simplified_path
