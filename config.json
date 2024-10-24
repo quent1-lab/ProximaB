@@ -42,5 +42,6 @@
   "screen_width": 800,
   "screen_height": 600,
   "scale": 16.0,
-  "camera_speed": 500
+  "camera_speed": 500,
+  "initial_chunk_radius" : 3
 }

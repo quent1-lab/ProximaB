@@ -119,7 +119,7 @@ class Simulation:
         while self.is_running:
             with entity_lock:
                 self.world.update_entities(self.delta_time)
-            time.sleep(0.01) # Cycle rapide pour les entités
+            time.sleep(0.05) # Cycle rapide pour les entités
 
     def update_chunks(self):
         """Mettre à jour les chunks (par exemple, génération de nouveaux biomes)."""

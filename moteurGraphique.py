@@ -43,6 +43,14 @@ class World:
         self.chunk_lock = self.__dict__.get("chunk_lock", None)
         self.entity_lock = self.__dict__.get("entity_lock", None)
         
+        self.init_loaded_chunks(config['initial_chunk_radius'])
+    
+    def init_loaded_chunks(self, radius):
+        """Charge un nombre initial de chunks dans le monde."""
+        for i in range(-radius, radius + 1):
+            for j in range(-radius, radius + 1):
+                self.get_chunk(i, j)
+        
     def unload_chunks_outside_view(self, left_bound, right_bound, top_bound, bottom_bound):
         """Décharge les chunks qui sont hors de la zone visible de la caméra après un délai."""
         chunk_size = self.config['chunk_size']
