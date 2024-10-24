@@ -1,6 +1,6 @@
 {
   "perlin": {
-    "seed": 42666425984962298,
+    "seed": 42666425984962299,
     "octaves": 0.8
   },
   "biomes": [
@@ -41,6 +41,6 @@
   "view_distance": 3,
   "screen_width": 800,
   "screen_height": 600,
-  "scale": 16,
+  "scale": 16.0,
   "camera_speed": 500
 }

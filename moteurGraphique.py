@@ -349,7 +349,7 @@ class Camera:
                         color = biome['color']
                         break
 
-                pygame.draw.rect(self.screen, color, pygame.Rect(screen_x, screen_y, self.scale, self.scale))
+                pygame.draw.rect(self.screen, color, pygame.Rect(screen_x, screen_y, self.scale+1, self.scale+1))
 
         if draw_chunk:
             # Afficher les bordures des chunks
