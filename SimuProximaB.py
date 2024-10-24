@@ -85,67 +85,6 @@ def generate_animals_in_world(world, max_animals_per_chunk=1):
                     world.add_entity(animal)
                     print(f"Un animal a été ajouté à la tuile {tile.x}, {tile.y}.")
                     return
-
-def main():
-    # Charger la configuration
-    config = load_config('config.json')
-    
-    # Initialiser Pygame
-    pygame.init()
-
-    # Créer le monde et la caméra
-    world = World(config)
-    camera = Camera(world, config, mode="free")
-
-    # Ajouter des PNJ avec des tailles var  iables
-    pnj1 = PNJ(5, 10, world, config, id=world.generate_id(), size=1.6)  # 1.6 mètres
-    world.add_entity(pnj1)
-    pnj2 = PNJ(12, 15, world, config, id=world.generate_id(),size=1.8)  # 1.8 mètres
-    world.add_entity(pnj2)
-    
-    # Boucle principale de simulation
-    clock = pygame.time.Clock()
-    running = True
-    while running:
-        delta_time = clock.tick(60) / 1000.0  # 60 FPS, delta_time en secondes
-
-        # Ajouter des animaux
-        generate_animals_in_world(world)
-        
-        # Ajouter de la nourriture
-        generate_food_in_world(world)
-
-        # Mise à jour des PNJ
-        world.update_entities(delta_time)
-        
-        # Changer le mode de la caméra selon l'input
-        keys = pygame.key.get_pressed()
-        if keys[pygame.K_KP1] and camera.mode != "fixed":
-            print("Mode fixe")
-            camera.set_mode("fixed")
-        elif keys[pygame.K_KP2] and camera.mode != "free":
-            print("Mode libre")
-            camera.set_mode("free")
-        elif keys[pygame.K_KP3] and camera.mode != "follow":
-            print("Mode follow")
-            camera.set_mode("follow", target_pnj=pnj1)
-        
-        # Mise à jour de la caméra
-        camera.update(delta_time)
-        
-        
-        # Rendu de la caméra
-        camera.render()
-        
-        # Gérer le survol des entités par la souris
-        handle_entity_hover_and_click(world, camera)
-
-        # Gérer les événements (fermeture de la fenêtre, etc.)
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
-                running = False
-
-    pygame.quit()
     
 # Gestion des verrous pour éviter les conflits sur les accès aux données partagées
 chunk_lock = threading.Lock()
@@ -203,7 +142,7 @@ class Simulation:
             self.camera.render()
             
             # Gérer le survol des entités par la souris
-            handle_entity_hover_and_click(self.world, self.camera)
+            # handle_entity_hover_and_click(self.world, self.camera)
             
             pygame.display.flip()
             # Ajuster la vitesse de rendu (par ex., 60 FPS)
@@ -215,7 +154,13 @@ class Simulation:
         """Arrêter la simulation."""
         self.is_running = False
 
+import cProfile
+import pstats
+
 def main2():
+    profiler = cProfile.Profile()
+    profiler.enable()
+    
     # Charger la configuration
     config = load_config('config.json')
     
@@ -229,6 +174,11 @@ def main2():
     sim = Simulation(world, camera)
     sim.initialize_simulation()
     sim.start_simulation()
+
+    profiler.disable()
+    stats = pstats.Stats(profiler)
+    stats.sort_stats(pstats.SortKey.TIME)
+    stats.print_stats()
 
 if __name__ == "__main__":
     main2()

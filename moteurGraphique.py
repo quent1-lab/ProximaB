@@ -220,26 +220,39 @@ class Camera:
     """Classe gérant la caméra comme entité invisible et fixe, les chunks se déplacent autour d'elle."""
     def __init__(self, world, config, mode="free", start_x=0, start_y=0):
         self.world = world
-        self.x = start_x
-        self.y = start_y
-        self.world_offset_x = 0
-        self.world_offset_y = 0
-        self.mode = mode
         self.config = config
+        self.mode = mode
         self.target_pnj = None  # PNJ à suivre
+
+        # Coordonnées du centre de la caméra dans le monde
+        self.camera_center_x = start_x
+        self.camera_center_y = start_y
+
+        # Échelle initiale (zoom de base)
+        self.scale = config['scale']
+        self.chunk_size = config['chunk_size']
+        self.zoom_speed = 0.5  # Vitesse de zoom
+
+        # Dimensions de l'écran
         self.screen_width = config['screen_width']
         self.screen_height = config['screen_height']
-        self.camera_center_x = self.screen_width // 2  # Caméra centrée horizontalement
-        self.camera_center_y = self.screen_height // 2  # Caméra centrée verticalement
-        self.scale = config['scale']  # Échelle initiale (zoom de base)
-        self.zoom_speed = 0.5  # Vitesse de zoom
         self.screen = pygame.display.set_mode((self.screen_width, self.screen_height))
+
+        # Position précédente de la caméra pour détecter le mouvement
+        self.previous_camera_position = (-1, -1)
 
     def set_mode(self, mode, target_pnj=None):
         """Définit le mode de la caméra (fixe, libre ou suivi d'un PNJ)."""
         self.mode = mode
         if mode == "follow":
             self.target_pnj = target_pnj
+
+    def has_camera_moved(self):
+        current_position = (self.camera_center_x, self.camera_center_y)
+        if current_position != self.previous_camera_position:
+            self.previous_camera_position = current_position
+            return True
+        return False
 
     def update(self, delta_time):
         """Met à jour le zoom dynamique et le déplacement des chunks pour donner l'effet de mouvement."""
@@ -257,52 +270,50 @@ class Camera:
                 dy = -1.0 * self.config['camera_speed'] * delta_time
             if keys[pygame.K_DOWN] or keys[pygame.K_s]:
                 dy = 1.0 * self.config['camera_speed'] * delta_time
-            self.move(dx, dy)    
+            self.move(dx, dy)
         elif self.mode == "follow" and self.target_pnj:
             # Suivre la position du PNJ
-            self.world_offset_x = self.target_pnj.x - self.camera_center_x / self.scale
-            self.world_offset_y = self.target_pnj.y - self.camera_center_y / self.scale
-
-        # Toujours s'assurer que les chunks sont chargés après mise à jour de la caméra
-        self.update_chunks()
+            self.camera_center_x = self.target_pnj.x
+            self.camera_center_y = self.target_pnj.y
 
     def move(self, dx, dy):
-        """Déplace le monde en fonction du déplacement de la caméra."""
-        self.world_offset_x += dx / self.scale
-        self.world_offset_y += dy / self.scale
-        self.update_chunks()
-
-    def update_chunks(self):
-        """Charge et décharge les chunks autour de la position actuelle de la caméra."""
-        camera_world_x = self.camera_center_x / self.scale + self.world_offset_x
-        camera_world_y = self.camera_center_y / self.scale + self.world_offset_y
-        
-        # Calculer la taille du chunk en termes de distance dans le monde
-        chunk_size_in_world = self.config['chunk_size']
-        
-        # Calculer les limites visibles de la caméra en termes de coordonnées du monde
-        left_bound = camera_world_x - (self.screen_width / 2) / self.scale
-        right_bound = camera_world_x + (self.screen_width / 2) / self.scale
-        top_bound = camera_world_y - (self.screen_height / 2) / self.scale
-        bottom_bound = camera_world_y + (self.screen_height / 2) / self.scale
-
-        # Charger les nouveaux chunks et décharger ceux qui ne sont plus visibles
-        self.world.load_chunks_around_camera(left_bound, right_bound, top_bound, bottom_bound)
-        self.world.unload_chunks_outside_view(left_bound, right_bound, top_bound, bottom_bound)
+        """Déplace la caméra en fonction du déplacement."""
+        self.camera_center_x += dx / self.scale
+        self.camera_center_y += dy / self.scale
 
     def handle_zoom(self):
         """Gère le zoom dynamique avec la molette de la souris."""
-        zoom_in = pygame.mouse.get_pressed()[0]  # Bouton gauche pour zoom avant
-        zoom_out = pygame.mouse.get_pressed()[2]  # Bouton droit pour zoom arrière
-        
+        zoom_in = False
+        zoom_out = False
+
+        keys = pygame.key.get_pressed()
+        if keys[pygame.K_a]:
+            zoom_in = True
+        if keys[pygame.K_e]:
+            zoom_out = True
+        if keys[pygame.K_r]:
+            self.scale = self.config['scale']
+            self.camera_center_x = self.config['screen_width'] // 2
+            self.camera_center_y = self.config['screen_height'] // 2
+
+        mouse_x, mouse_y = pygame.mouse.get_pos()
+        world_mouse_x = mouse_x / self.scale + self.camera_center_x - self.screen_width / (2 * self.scale)
+        world_mouse_y = mouse_y / self.scale + self.camera_center_y - self.screen_height / (2 * self.scale)
+
         if zoom_in:
             self.scale += self.zoom_speed
         if zoom_out and self.scale > self.zoom_speed:  # Empêcher un zoom trop petit
             self.scale -= self.zoom_speed
 
+        new_world_mouse_x = mouse_x / self.scale + self.camera_center_x - self.screen_width / (2 * self.scale)
+        new_world_mouse_y = mouse_y / self.scale + self.camera_center_y - self.screen_height / (2 * self.scale)
+
+        self.camera_center_x += world_mouse_x - new_world_mouse_x
+        self.camera_center_y += world_mouse_y - new_world_mouse_y
+
     def render(self):
         """Affiche le monde et les PNJ avec déplacement du décor en fonction de la caméra."""
-        self.screen.fill((135, 206, 235))  # Fond bleu ciel
+        # self.screen.fill((135, 206, 235))  # Fond bleu ciel
 
         # Afficher les chunks
         self.render_visible_chunks()
@@ -310,10 +321,10 @@ class Camera:
         # Afficher les PNJ
         for entity_list in self.world.entities.values():
             for entity in entity_list:
-                screen_x = int((entity.x - self.world_offset_x) * self.scale)
-                screen_y = int((entity.y - self.world_offset_y) * self.scale)
+                screen_x = int((entity.x - self.camera_center_x + self.screen_width / 2 / self.scale) * self.scale)
+                screen_y = int((entity.y - self.camera_center_y + self.screen_height / 2 / self.scale) * self.scale)
                 entity.render(self.screen, self.scale, screen_x, screen_y)
-        
+
         # Dessiner le chemin du PNJ
         for pnj in self.world.entities['PNJ']:
             for i in range(len(pnj.path)):
@@ -322,10 +333,12 @@ class Camera:
                 else:
                     start_x, start_y = pnj.path[i - 1]
                 end_x, end_y = pnj.path[i]
-                pygame.draw.line(self.screen, (255, 0, 0), 
-                                 ((start_x - self.world_offset_x) * self.scale, (start_y - self.world_offset_y) * self.scale),
-                                 ((end_x - self.world_offset_x) * self.scale, (end_y - self.world_offset_y) * self.scale))
-        
+                pygame.draw.line(self.screen, (255, 0, 0),
+                                 ((start_x - self.camera_center_x + self.screen_width / 2 / self.scale) * self.scale,
+                                  (start_y - self.camera_center_y + self.screen_height / 2 / self.scale) * self.scale),
+                                 ((end_x - self.camera_center_x + self.screen_width / 2 / self.scale) * self.scale,
+                                  (end_y - self.camera_center_y + self.screen_height / 2 / self.scale) * self.scale))
+
         # Ecriture du nombre de chunks chargés
         font = pygame.font.Font(None, 24)
         text = font.render(f"Chunks loaded: {len(self.world.loaded_chunks)}", True, (255, 255, 255))
@@ -333,50 +346,52 @@ class Camera:
 
     def render_chunk(self, chunk, *args):
         """Affiche un chunk avec déplacement en fonction de la caméra."""
-        
-        draw_chunk = args[0] if args else False            
-        
+        draw_chunk = args[0] if args else False
+
         for x in range(chunk.chunk_size):
             for y in range(chunk.chunk_size):
                 tile_type = chunk.tiles[x][y].biome
-                screen_x = int((chunk.x_offset + x - self.world_offset_x) * self.scale)
-                screen_y = int((chunk.y_offset + y - self.world_offset_y) * self.scale)
+                screen_x = int((chunk.x_offset + x - self.camera_center_x + self.screen_width / 2 / self.scale) * self.scale)
+                screen_y = int((chunk.y_offset + y - self.camera_center_y + self.screen_height / 2 / self.scale) * self.scale)
 
-                color = (10,10,50)
+                color = (10, 10, 50)
                 # Déterminer la couleur en fonction du biome
                 for biome in self.config['biomes']:
                     if tile_type == biome['name']:
                         color = biome['color']
                         break
 
-                pygame.draw.rect(self.screen, color, pygame.Rect(screen_x, screen_y, self.scale+1, self.scale+1))
+                pygame.draw.rect(self.screen, color, pygame.Rect(screen_x, screen_y, self.scale + 1, self.scale + 1))
 
         if draw_chunk:
             # Afficher les bordures des chunks
             chunk_border_color = (255, 255, 255)
-            pygame.draw.rect(self.screen, chunk_border_color, 
-                            pygame.Rect((chunk.x_offset - self.world_offset_x) * self.scale, 
-                                        (chunk.y_offset - self.world_offset_y) * self.scale, 
-                                        chunk.chunk_size * self.scale, chunk.chunk_size * self.scale), 1)
-
+            pygame.draw.rect(self.screen, chunk_border_color,
+                             pygame.Rect((chunk.x_offset - self.camera_center_x + self.screen_width / 2 / self.scale) * self.scale,
+                                         (chunk.y_offset - self.camera_center_y + self.screen_height / 2 / self.scale) * self.scale,
+                                         chunk.chunk_size * self.scale, chunk.chunk_size * self.scale), 1)
+    
     def render_visible_chunks(self):
         """Affiche uniquement les chunks qui sont dans le champ de la caméra."""
-        # Calculer les limites visibles de la caméra en termes de coordonnées du monde
-        camera_world_x = self.camera_center_x / self.scale + self.world_offset_x
-        camera_world_y = self.camera_center_y / self.scale + self.world_offset_y
-        
-        left_bound = camera_world_x - (self.screen_width / 2) / self.scale
-        right_bound = camera_world_x + (self.screen_width / 2) / self.scale
-        top_bound = camera_world_y - (self.screen_height / 2) / self.scale
-        bottom_bound = camera_world_y + (self.screen_height / 2) / self.scale
-        
-        chunk_size = self.config['chunk_size']
+        if not self.has_camera_moved():
+            return  # Ne rien faire si la caméra n'a pas bougé
+
+        half_screen_width = self.screen_width // 2
+        half_screen_height = self.screen_height // 2
+
+        camera_world_x = self.camera_center_x
+        camera_world_y = self.camera_center_y
+
+        left_bound = camera_world_x - half_screen_width / self.scale
+        right_bound = camera_world_x + half_screen_width / self.scale
+        top_bound = camera_world_y - half_screen_height / self.scale
+        bottom_bound = camera_world_y + half_screen_height / self.scale
 
         # Détermine les coordonnées des chunks visibles
-        left_chunk = int(left_bound // chunk_size)
-        right_chunk = int(right_bound // chunk_size)
-        top_chunk = int(top_bound // chunk_size)
-        bottom_chunk = int(bottom_bound // chunk_size)
+        left_chunk = int(left_bound // self.chunk_size)
+        right_chunk = int(right_bound // self.chunk_size)
+        top_chunk = int(top_bound // self.chunk_size)
+        bottom_chunk = int(bottom_bound // self.chunk_size)
 
         # Affiche les chunks visibles
         for chunk_x in range(left_chunk, right_chunk + 1):
@@ -384,7 +399,3 @@ class Camera:
                 chunk = self.world.get_chunk(chunk_x, chunk_y)
                 if chunk:
                     self.render_chunk(chunk)
-
-    def render_pnj(self, screen_x, screen_y):
-        """Affiche un PNJ avec un décalage par rapport à la caméra."""
-        pygame.draw.circle(self.screen, (255, 0, 0), (screen_x, screen_y), int(self.scale // 2))
