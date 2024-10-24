@@ -96,6 +96,10 @@ class Entity:
         """Met à jour l'entité."""
         self.move(delta_time)
 
+    def has_moved(self):
+        """Retourne True si l'entité a bougé, False sinon."""
+        return self.vx != 0 or self.vy != 0
+    
     def __str__(self) -> str:
         return f"{self.entity_type} at ({self.x:.1f}, {self.y:.1f})"
 

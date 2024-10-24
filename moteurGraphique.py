@@ -254,6 +254,12 @@ class Camera:
             return True
         return False
 
+    def entity_has_moved(self):
+        # Vérifier si une entité a bougé 
+        for entity_list in self.world.entities.values():
+            for entity in entity_list:
+                return entity.has_moved()
+
     def update(self, delta_time):
         """Met à jour le zoom dynamique et le déplacement des chunks pour donner l'effet de mouvement."""
         self.handle_zoom()
@@ -373,7 +379,7 @@ class Camera:
     
     def render_visible_chunks(self):
         """Affiche uniquement les chunks qui sont dans le champ de la caméra."""
-        if not self.has_camera_moved():
+        if not self.has_camera_moved() and not self.entity_has_moved():
             return  # Ne rien faire si la caméra n'a pas bougé
 
         half_screen_width = self.screen_width // 2
