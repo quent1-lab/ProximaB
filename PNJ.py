@@ -165,12 +165,17 @@ class PNJ(Entity):
     def check_adjacent_tiles_for_resource(self, resource_type):
         """Vérifie si une ressource est présente dans les cases adjacentes au PNJ."""
         adjacent_offsets = [(-1, 0), (1, 0), (0, -1), (0, 1),
-                            (-2,0), (2,0), (0,-2), (0,2)]   # Cases adjacentes : droite, gauche, haut, bas
+                            (-2, 0), (2, 0), (0, -2), (0, 2),
+                            (-1, -1), (-1, 1), (1, -1), (1, 1),
+                            (-2, -1), (-2, 1), (2, -1), (2, 1),
+                            (-1, -2), (-1, 2), (1, -2), (1, 2),
+                            (-2, -2), (-2, 2), (2, -2), (2, 2)]  # Cases adjacentes : droite, gauche, haut, bas, et diagonales
         
         for dx, dy in adjacent_offsets:
             adjacent_x = self.x + dx
             adjacent_y = self.y + dy
             tile = self.world.get_tile_at(adjacent_x, adjacent_y)
+            print(f"{self.name} vérifie la case ({adjacent_x}, {adjacent_y}) la tuile est {tile.biome}")
             
             if tile and tile.biome == resource_type:
                 return True
