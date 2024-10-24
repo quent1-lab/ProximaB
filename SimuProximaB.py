@@ -14,8 +14,8 @@ def handle_entity_hover_and_click(world, camera):
     mouse_x, mouse_y = pygame.mouse.get_pos()
 
     # Convertir la position de la souris en coordonnées du monde
-    world_mouse_x = (mouse_x / camera.scale) + camera.world_offset_x
-    world_mouse_y = (mouse_y / camera.scale) + camera.world_offset_y
+    world_mouse_x = mouse_x / camera.scale + camera.camera_center_x - camera.screen_width / 2 / camera.scale
+    world_mouse_y = mouse_y / camera.scale + camera.camera_center_y - camera.screen_height / 2 / camera.scale
 
     hovered_entity = None
 
@@ -29,7 +29,7 @@ def handle_entity_hover_and_click(world, camera):
 
     # Si une entité est survolée, afficher ses informations en haut à gauche
     if hovered_entity :
-        display_entity_info(hovered_entity, camera)
+        #display_entity_info(hovered_entity, camera)
 
         # Si un clic gauche est détecté, centrer la caméra sur l'entité
         if pygame.mouse.get_pressed()[0]:
@@ -142,7 +142,7 @@ class Simulation:
             self.camera.render()
             
             # Gérer le survol des entités par la souris
-            # handle_entity_hover_and_click(self.world, self.camera)
+            handle_entity_hover_and_click(self.world, self.camera)
             
             pygame.display.flip()
             # Ajuster la vitesse de rendu (par ex., 60 FPS)
