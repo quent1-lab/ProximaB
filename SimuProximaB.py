@@ -72,20 +72,42 @@ def generate_food_in_world(world, max_food_per_chunk=5):
                     print(f"Une pomme a été ajoutée à la tuile {tile.x}, {tile.y}.")
                     return
 
-def generate_animals_in_world(world, max_animals_per_chunk=2):
-    for chunk in world.loaded_chunks.values():
-        for tiles in chunk.tiles:
-            for tile in tiles:
-                animal_count = sum(1 for tile in tiles if isinstance(tile.has_entity, Animal))
-                count = chunk.entity_count.get("animal", 0)
-                if count >= max_animals_per_chunk:
-                    continue
-                if tile.biome == "Plains" and random.random() < 0.0001 and not tile.has_entity:
-                    animal = Animal("vache",x=tile.x, y=tile.y, world=world)
-                    tile.set_entity_presence(animal)
-                    world.add_entity(animal)
-                    print(f"Un animal a été ajouté à la tuile {tile.x}, {tile.y}.")
-                    return
+def generate_animals_in_world(world, max_animals_per_chunk=2, radius=1):
+    entity_positions = [(entity.x, entity.y) for entity_list in world.entities.values() for entity in entity_list]
+    chunk_list = []
+    
+    # Récupère les chunk ou au moins un pnj est présent
+    for entity in world.entities["PNJ"]:
+        chunk = world.get_chunk_from_position(entity.x, entity.y)
+        if chunk not in chunk_list:
+            chunk_list.append(chunk)
+    
+    # Ajoute les chunk adjacent dans un rayon de 1
+    for chunk in chunk_list.copy():
+        adjacent_chunks = world.get_chunks_around(chunk.x_offset, chunk.y_offset, radius)
+        for adjacent_chunk in adjacent_chunks:
+            if adjacent_chunk not in chunk_list:
+                chunk_list.append(adjacent_chunk)
+    
+    # Parcours les chunk pour ajouter des animaux
+    for chunk in chunk_list:
+        count = chunk.entity_count.get("animal", 0)
+        if count >= max_animals_per_chunk:
+            continue
+
+        # Génère une position aléatoire dans le chunk
+        x = random.randint(chunk.x_offset, chunk.x_offset + chunk.chunk_size - 1)
+        y = random.randint(chunk.y_offset, chunk.y_offset + chunk.chunk_size - 1)
+        
+        tile = chunk.tiles[x - chunk.x_offset][y - chunk.y_offset]
+        
+        # Vérifie si la position est déjà occupée par une entité et que la tuile est de type "Plaine"
+        if (x, y) not in entity_positions and tile.biome == "Plains":
+            animal = Animal("vache",  x=x, y=y, world=world)
+            tile.set_entity_presence(animal)
+            world.add_entity(animal)
+            print(f"Un animal a été ajouté à la tuile {tile.x}, {tile.y}.")
+            return
     
 # Gestion des verrous pour éviter les conflits sur les accès aux données partagées
 chunk_lock = threading.Lock()
@@ -178,7 +200,7 @@ def main2():
     profiler.disable()
     stats = pstats.Stats(profiler)
     stats.sort_stats(pstats.SortKey.TIME)
-    stats.print_stats()
+    # stats.print_stats()
 
 if __name__ == "__main__":
     main2()

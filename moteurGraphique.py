@@ -177,6 +177,12 @@ class World:
                 chunks.append(self.get_chunk(chunk_x + i, chunk_y + j))
         return chunks     
     
+    def get_chunk_from_position(self, x, y):
+        """Retourne le chunk contenant les coordonnées (x, y)."""
+        chunk_x = int(x) // self.config['chunk_size']
+        chunk_y = int(y) // self.config['chunk_size']
+        return self.get_chunk(chunk_x, chunk_y)
+    
     def load_chunks_around_camera(self, left_bound, right_bound, top_bound, bottom_bound):
         """Charge les chunks dans la zone définie par les limites visibles de la caméra."""
         chunk_size = self.config['chunk_size']
@@ -393,8 +399,8 @@ class Camera:
     
     def render_visible_chunks(self):
         """Affiche uniquement les chunks qui sont dans le champ de la caméra."""
-        if not self.has_camera_moved() and not self.entity_has_moved():
-            return  # Ne rien faire si la caméra n'a pas bougé
+        # if not self.has_camera_moved() and not self.entity_has_moved():
+        #     return  # Ne rien faire si la caméra n'a pas bougé
 
         half_screen_width = self.screen_width // 2
         half_screen_height = self.screen_height // 2
