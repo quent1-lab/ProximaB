@@ -196,6 +196,8 @@ def main2():
     sim = Simulation(world, camera)
     sim.initialize_simulation()
     sim.start_simulation()
+    
+    world.save_chunks_to_file()
 
     profiler.disable()
     stats = pstats.Stats(profiler)

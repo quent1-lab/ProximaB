@@ -1,4 +1,4 @@
-import json, pygame, uuid, perlin_noise, numpy as np
+import json, pygame, uuid, perlin_noise, os, json, numpy as np
 from chunk_ import Chunk
 
 # Charger la configuration depuis un fichier JSON
@@ -43,10 +43,34 @@ class World:
         self.chunk_lock = self.__dict__.get("chunk_lock", None)
         self.entity_lock = self.__dict__.get("entity_lock", None)
         
+        self.chunk_file = 'data/chunks.json'  # Fichier pour stocker les chunks
         self.init_loaded_chunks(config['initial_chunk_radius'])
+        # self.load_chunks_from_file()
+    
+    def save_chunks_to_file(self):
+        """Enregistre tous les chunks dans un fichier."""
+        chunks_data = {f"{chunk.x_offset}_{chunk.y_offset}": chunk.to_dict() for chunk in self.loaded_chunks.values()}
+        with open(self.chunk_file, 'w') as f:
+            json.dump(chunks_data, f)
+
+    def load_chunks_from_file(self):
+        """Charge tous les chunks à partir d'un fichier."""
+        if os.path.exists(self.chunk_file):
+            if os.path.getsize(self.chunk_file) == 0:
+                print(f"Le fichier {self.chunk_file} est vide.")
+                return
+            try:
+                with open(self.chunk_file, 'r') as f:
+                    chunks_data = json.load(f)
+                    for key, data in chunks_data.items():
+                        chunk_x, chunk_y = map(int, key.split('_'))
+                        self.loaded_chunks[(chunk_x, chunk_y)] = Chunk.from_dict(data, self.noise_generator, self.config, self.chunk_lock, self.entity_lock)
+            except json.JSONDecodeError as e:
+                print(f"Erreur de décodage JSON pour le fichier {self.chunk_file} : {e}")
     
     def init_loaded_chunks(self, radius):
         """Charge un nombre initial de chunks dans le monde."""
+        self.load_chunks_from_file()
         for i in range(-radius, radius + 1):
             for j in range(-radius, radius + 1):
                 self.get_chunk(i, j)
@@ -159,11 +183,7 @@ class World:
         """Retourne un chunk, le génère si nécessaire."""
         if (chunk_x, chunk_y) not in self.loaded_chunks:
             # Générer et stocker le chunk s'il n'existe pas encore
-            self.loaded_chunks[(chunk_x, chunk_y)] = Chunk(chunk_x * self.config['chunk_size'], chunk_y * self.config['chunk_size'], self.noise_generator, self.config, chunk_lock=self.chunk_lock, entity_lock=self.entity_lock)
-            # Ajouter un log pour enregistrer l'appel
-            # print(f"Chunk généré pour ({chunk_x}, {chunk_y})")
-            # print("Appelé par :")
-            # traceback.print_stack(limit=5)  # Limite la profondeur de la pile d'appels affichée
+            self.loaded_chunks[(chunk_x, chunk_y)] = Chunk(chunk_x, chunk_y , self.noise_generator, self.config, chunk_lock=self.chunk_lock, entity_lock=self.entity_lock)
         return self.loaded_chunks[(chunk_x, chunk_y)]
     
     def get_chunks_around(self,x,y,radius):
