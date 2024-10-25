@@ -72,12 +72,13 @@ def generate_food_in_world(world, max_food_per_chunk=5):
                     print(f"Une pomme a été ajoutée à la tuile {tile.x}, {tile.y}.")
                     return
 
-def generate_animals_in_world(world, max_animals_per_chunk=1):
+def generate_animals_in_world(world, max_animals_per_chunk=2):
     for chunk in world.loaded_chunks.values():
         for tiles in chunk.tiles:
             for tile in tiles:
                 animal_count = sum(1 for tile in tiles if isinstance(tile.has_entity, Animal))
-                if animal_count >= max_animals_per_chunk:
+                count = chunk.entity_count.get("animal", 0)
+                if count >= max_animals_per_chunk:
                     continue
                 if tile.biome == "Plains" and random.random() < 0.0001 and not tile.has_entity:
                     animal = Animal("vache",x=tile.x, y=tile.y, world=world)
@@ -109,7 +110,7 @@ class Simulation:
     def start_simulation(self):
         """Lancer les threads pour chaque module."""
         threading.Thread(target=self.update_entities, daemon=True).start()
-        #threading.Thread(target=self.update_chunks, daemon=True).start()
+        threading.Thread(target=self.update_chunks, daemon=True).start()
         #threading.Thread(target=self.update_display, daemon=True).start()
         
         self.run_pygame()
@@ -125,9 +126,7 @@ class Simulation:
     def update_chunks(self):
         """Mettre à jour les chunks (par exemple, génération de nouveaux biomes)."""
         while self.is_running:
-            with chunk_lock:
-                for chunk in self.world.loaded_chunks.values():
-                    chunk.update_tiles()  # Par exemple, mise à jour de l'herbe ou des biomes
+            generate_animals_in_world(self.world)
             time.sleep(1)  # Cycle plus lent car les chunks n'ont pas besoin de mises à jour rapides
 
     def run_pygame(self):

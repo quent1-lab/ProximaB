@@ -104,6 +104,12 @@ class World:
         if entity.entity_type not in self.entities:
             self.entities[entity.entity_type] = []
         self.entities[entity.entity_type].append(entity)
+        
+        # Mettre à jour la quantité d'entités dans le chunk
+        chunk_x = int(entity.x) // self.config['chunk_size']
+        chunk_y = int(entity.y) // self.config['chunk_size']
+        chunk = self.get_chunk(chunk_x, chunk_y)
+        chunk.add_entity(entity.entity_type)
     
     def remove_entity(self, entity_id):
         """Supprime une entité du monde."""
