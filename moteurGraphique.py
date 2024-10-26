@@ -49,7 +49,7 @@ class World:
     
     def save_chunks_to_file(self):
         """Enregistre tous les chunks dans un fichier."""
-        chunks_data = {f"{chunk.x_offset}_{chunk.y_offset}": chunk.to_dict() for chunk in self.loaded_chunks.values()}
+        chunks_data = {f"{chunk.x}_{chunk.y}": chunk.to_dict() for chunk in self.loaded_chunks.values()}
         with open(self.chunk_file, 'w') as f:
             json.dump(chunks_data, f)
 
@@ -361,8 +361,14 @@ class Camera:
         """Affiche le monde et les PNJ avec déplacement du décor en fonction de la caméra."""
         # self.screen.fill((135, 206, 235))  # Fond bleu ciel
 
-        # Afficher les chunks
-        self.render_visible_chunks()
+        # Récupérer toutes les tuiles des chunks visibles
+        visible_tiles = self.get_visible_tiles()
+
+        # Appliquer le greedy meshing sur les tuiles visibles
+        rectangles = self.greedy_mesh(visible_tiles)
+
+        # Rendre les rectangles optimisés
+        self.render_rectangles(rectangles)
 
         # Afficher les PNJ
         for entity_list in self.world.entities.values():
@@ -380,48 +386,18 @@ class Camera:
                     start_x, start_y = pnj.path[i - 1]
                 end_x, end_y = pnj.path[i]
                 pygame.draw.line(self.screen, (255, 0, 0),
-                                 ((start_x - self.camera_center_x + self.screen_width / 2 / self.scale) * self.scale,
-                                  (start_y - self.camera_center_y + self.screen_height / 2 / self.scale) * self.scale),
-                                 ((end_x - self.camera_center_x + self.screen_width / 2 / self.scale) * self.scale,
-                                  (end_y - self.camera_center_y + self.screen_height / 2 / self.scale) * self.scale))
+                                ((start_x - self.camera_center_x + self.screen_width / 2 / self.scale) * self.scale,
+                                (start_y - self.camera_center_y + self.screen_height / 2 / self.scale) * self.scale),
+                                ((end_x - self.camera_center_x + self.screen_width / 2 / self.scale) * self.scale,
+                                (end_y - self.camera_center_y + self.screen_height / 2 / self.scale) * self.scale))
 
         # Ecriture du nombre de chunks chargés
         font = pygame.font.Font(None, 24)
         text = font.render(f"Chunks loaded: {len(self.world.loaded_chunks)}", True, (255, 255, 255))
         self.screen.blit(text, (10, 40))
 
-    def render_chunk(self, chunk, *args):
-        """Affiche un chunk avec déplacement en fonction de la caméra."""
-        draw_chunk = args[0] if args else False
-
-        for x in range(chunk.chunk_size):
-            for y in range(chunk.chunk_size):
-                tile_type = chunk.tiles[x][y].biome
-                screen_x = int((chunk.x_offset + x - self.camera_center_x + self.screen_width / 2 / self.scale) * self.scale)
-                screen_y = int((chunk.y_offset + y - self.camera_center_y + self.screen_height / 2 / self.scale) * self.scale)
-
-                color = (10, 10, 50)
-                # Déterminer la couleur en fonction du biome
-                for biome in self.config['biomes']:
-                    if tile_type == biome['name']:
-                        color = biome['color']
-                        break
-
-                pygame.draw.rect(self.screen, color, pygame.Rect(screen_x, screen_y, self.scale + 1, self.scale + 1))
-
-        if draw_chunk:
-            # Afficher les bordures des chunks
-            chunk_border_color = (255, 255, 255)
-            pygame.draw.rect(self.screen, chunk_border_color,
-                             pygame.Rect((chunk.x_offset - self.camera_center_x + self.screen_width / 2 / self.scale) * self.scale,
-                                         (chunk.y_offset - self.camera_center_y + self.screen_height / 2 / self.scale) * self.scale,
-                                         chunk.chunk_size * self.scale, chunk.chunk_size * self.scale), 1)
-    
-    def render_visible_chunks(self):
-        """Affiche uniquement les chunks qui sont dans le champ de la caméra."""
-        # if not self.has_camera_moved() and not self.entity_has_moved():
-        #     return  # Ne rien faire si la caméra n'a pas bougé
-
+    def get_visible_tiles(self):
+        """Récupère toutes les tuiles des chunks visibles avec leurs coordonnées globales."""
         half_screen_width = self.screen_width // 2
         half_screen_height = self.screen_height // 2
 
@@ -439,9 +415,66 @@ class Camera:
         top_chunk = int(top_bound // self.chunk_size)
         bottom_chunk = int(bottom_bound // self.chunk_size)
 
-        # Affiche les chunks visibles
+        visible_tiles = {}
         for chunk_x in range(left_chunk, right_chunk + 1):
             for chunk_y in range(top_chunk, bottom_chunk + 1):
                 chunk = self.world.get_chunk(chunk_x, chunk_y)
                 if chunk:
-                    self.render_chunk(chunk)
+                    for row in chunk.tiles:
+                        for tile in row:
+                            global_x = tile.x + chunk_x
+                            global_y = tile.y + chunk_y
+                            visible_tiles[(global_x, global_y)] = tile
+
+        return visible_tiles
+
+    def greedy_mesh(self, tiles):
+        """Applique l'algorithme de greedy meshing sur les tuiles visibles."""
+        if not tiles:
+            return []
+
+        visited = set()
+        rectangles = []
+
+        for (global_x, global_y), tile in tiles.items():
+            if (global_x, global_y) in visited:
+                continue
+
+            tile_type = tile.biome
+            width, height = 1, 1
+
+            # Trouver la largeur maximale
+            while (global_x + width, global_y) in tiles and tiles[(global_x + width, global_y)].biome == tile_type and (global_x + width, global_y) not in visited:
+                width += 1
+
+            # Trouver la hauteur maximale
+            while all((global_x + w, global_y + height) in tiles and tiles[(global_x + w, global_y + height)].biome == tile_type and (global_x + w, global_y + height) not in visited for w in range(width)):
+                height += 1
+
+            # Marquer les tuiles comme visitées
+            for dy in range(height):
+                for dx in range(width):
+                    visited.add((global_x + dx, global_y + dy))
+
+            # Ajouter le rectangle à la liste
+            rectangles.append((global_x, global_y, width, height, tile_type))
+
+        return rectangles
+
+    def render_rectangles(self, rectangles):
+        """Rend les rectangles optimisés."""
+        for rect in rectangles:
+            global_x, global_y, width, height, tile_type = rect
+            screen_x = int((global_x - self.camera_center_x + self.screen_width / 2 / self.scale) * self.scale)
+            screen_y = int((global_y - self.camera_center_y + self.screen_height / 2 / self.scale) * self.scale)
+            screen_width = int(width * self.scale)
+            screen_height = int(height * self.scale)
+
+            color = (10, 10, 50)
+            # Déterminer la couleur en fonction du biome
+            for biome in self.config['biomes']:
+                if tile_type == biome['name']:
+                    color = biome['color']
+                    break
+
+            pygame.draw.rect(self.screen, color, pygame.Rect(screen_x, screen_y, screen_width+20, screen_height+20))

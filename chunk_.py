@@ -160,4 +160,4 @@ class Chunk:
         return chunk
 
     def __str__(self) -> str:
-        return f"Chunk at {self.x_offset}, {self.y_offset}, Entities: {self.entity_count}, Biomes: {self.biome_count}"
+        return f"Chunk {self.x_offset}, {self.y_offset}"
