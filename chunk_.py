@@ -63,6 +63,8 @@ class Chunk:
         self.chunk_lock = chunk_lock
         self.entity_lock = entity_lock
         self.tiles = None
+        self.mesh_cache = None
+        
         if not loaded:
             self.tiles = self.generate_chunk(noise_generator, config)
     
@@ -143,6 +145,16 @@ class Chunk:
     def interpolate_biomes(self, biome1, biome2, mix_factor):
         """Mélange deux biomes en fonction du facteur de mixage."""
         return biome1 if mix_factor < 0.5 else biome2
+    
+    def calculate_mesh(self, greedy_mesh):
+        if self.mesh_cache is not None:
+            return self.mesh_cache
+        self.mesh_cache = greedy_mesh(self.tiles)
+        return self.mesh_cache
+
+    def update_tile(self, x, y, new_tile):
+        self.tiles[(x, y)] = new_tile
+        self.mesh_cache = None  # Invalidate cache
     
     def to_dict(self):
         """Convertit le chunk en un dictionnaire sérialisable."""

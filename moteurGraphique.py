@@ -1,5 +1,6 @@
 import json, pygame, uuid, perlin_noise, os, json, numpy as np
 from chunk_ import Chunk
+import concurrent.futures
 
 # Charger la configuration depuis un fichier JSON
 def load_config(file_path):
@@ -43,7 +44,7 @@ class World:
         self.chunk_lock = self.__dict__.get("chunk_lock", None)
         self.entity_lock = self.__dict__.get("entity_lock", None)
         
-        self.chunk_file = 'data/chunks.json'  # Fichier pour stocker les chunks
+        self.chunk_file = f'data/chunks_{config["perlin"]['seed']}_{config["perlin"]['octaves']}.json'  # Fichier pour stocker les chunks
         self.init_loaded_chunks(config['initial_chunk_radius'])
         # self.load_chunks_from_file()
     
@@ -358,17 +359,43 @@ class Camera:
         self.camera_center_x += world_mouse_x - new_world_mouse_x
         self.camera_center_y += world_mouse_y - new_world_mouse_y
 
+    def greedy_mesh_parallel(self, visible_tiles_by_chunk):
+        """Optimisation en utilisant plusieurs threads pour traiter plusieurs chunks en parallèle."""
+        rectangles = []
+        
+        def process_chunk(chunk_data):
+            """Exécuter le greedy meshing sur un chunk donné."""
+            return self.greedy_mesh_optimized(chunk_data)
+
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            futures = [executor.submit(process_chunk, chunk) for chunk in visible_tiles_by_chunk]
+            for future in concurrent.futures.as_completed(futures):
+                rectangles.extend(future.result())
+
+        return rectangles
+
     def render(self):
         """Affiche le monde et les PNJ avec déplacement du décor en fonction de la caméra."""
         # self.screen.fill((135, 206, 235))  # Fond bleu ciel
 
+        # Récupère tous les chunks visibles
+        # visible_chunks = self.get_visible_chunks()
+        
+        rectangles = []
+        
+        # for chunk in visible_chunks:
+        #     chunk_x, chunk_y = chunk
+        #     chunk = self.world.get_chunk(chunk_x, chunk_y)
+        #     rectangles.extend(chunk.calculate_mesh(self.greedy_mesh_optimized))
+        
         # Récupérer toutes les tuiles des chunks visibles
         visible_tiles, width, height = self.get_visible_tiles()
         
         # self.render_visible_tiles(visible_tiles)
 
         # Appliquer le greedy meshing sur les tuiles visibles
-        rectangles = self.greedy_mesh(visible_tiles)
+        #rectangles = self.greedy_mesh(visible_tiles)
+        rectangles = self.greedy_mesh_optimized(visible_tiles)
 
         # Rendre les rectangles optimisés
         self.render_rectangles(rectangles)
@@ -397,7 +424,7 @@ class Camera:
         # Ecriture du nombre de chunks chargés
         text = self.font.render(f"Chunks loaded: {len(self.world.loaded_chunks)}", True, (255, 255, 255))
         self.screen.blit(text, (10, 40))
-
+    
     def get_visible_tiles(self):
         """Récupère toutes les tuiles des chunks visibles avec leurs coordonnées globales."""
         half_screen_width = self.screen_width / 2  # Utiliser une division flottante
@@ -435,6 +462,33 @@ class Camera:
 
         return visible_tiles, width, height
 
+    def get_visible_chunks(self):
+        """Récupère tous les chunks visibles avec leurs coordonnées globales."""
+        half_screen_width = self.screen_width / 2  # Utiliser une division flottante
+        half_screen_height = self.screen_height / 2
+
+        camera_world_x = self.camera_center_x
+        camera_world_y = self.camera_center_y
+
+        # Limites exactes en flottant
+        left_bound = camera_world_x - half_screen_width / self.scale
+        right_bound = camera_world_x + half_screen_width / self.scale
+        top_bound = camera_world_y - half_screen_height / self.scale
+        bottom_bound = camera_world_y + half_screen_height / self.scale
+
+        # Calcule des chunks visibles
+        left_chunk = int(left_bound // self.chunk_size)
+        right_chunk = int(right_bound // self.chunk_size)
+        top_chunk = int(top_bound // self.chunk_size)
+        bottom_chunk = int(bottom_bound // self.chunk_size)
+
+        visible_chunks = []
+        for chunk_x in range(left_chunk, right_chunk + 1):
+            for chunk_y in range(top_chunk, bottom_chunk + 1):
+                visible_chunks.append((chunk_x, chunk_y))
+        
+        return visible_chunks
+
     def greedy_mesh(self, tiles):
         """Applique l'algorithme de greedy meshing sur les tuiles visibles."""
         if not tiles:
@@ -468,53 +522,42 @@ class Camera:
 
         return rectangles
 
-
-    def greedy_mesh_with_bitmap(self, tiles, width, height):
-        """Greedy meshing optimisé avec une matrice de bitmaps pour marquer les tuiles visitées."""
-        # Déterminer les dimensions du monde
+    def greedy_mesh_optimized(self, tiles):
+        """Optimisation du greedy meshing avec balayage horizontal."""
         if not tiles:
-            return
-        
-        # Créer une matrice de bits avec numpy pour stocker les tuiles visitées
-        visited = np.zeros((width, height), dtype=bool)
+            return []
 
+        visited = set()
         rectangles = []
 
-        for global_y in range(height):
-            for global_x in range(width):
-                # Si la tuile est déjà visitée, passer à la suivante
-                if visited[global_x, global_y]:
-                    continue
+        for (global_x, global_y), tile in tiles.items():
+            if (global_x, global_y) in visited:
+                continue
 
-                tile = tiles.get((global_x, global_y), None)
-                if tile is None:
-                    continue
+            tile_type = tile.biome
+            width, height = 1, 1
 
-                tile_type = tile.biome
-                width_extent, height_extent = 1, 1
+            # Étendre en largeur tant que les tuiles adjacentes sont du même type
+            while (global_x + width, global_y) in tiles and tiles[(global_x + width, global_y)].biome == tile_type and (global_x + width, global_y) not in visited:
+                width += 1
 
-                # Étendre en largeur
-                while global_x + width_extent < width and tiles.get((global_x + width_extent, global_y), None) and \
-                    tiles[(global_x + width_extent, global_y)].biome == tile_type and not visited[global_x + width_extent, global_y]:
-                    width_extent += 1
+            # Étendre verticalement si toutes les tuiles dans la rangée ont le même type
+            extendable = True
+            while extendable:
+                for dx in range(width):
+                    if (global_x + dx, global_y + height) not in tiles or tiles[(global_x + dx, global_y + height)].biome != tile_type or (global_x + dx, global_y + height) in visited:
+                        extendable = False
+                        break
+                if extendable:
+                    height += 1
 
-                # Étendre en hauteur
-                extendable = True
-                while extendable and global_y + height_extent < height:
-                    for dx in range(width_extent):
-                        if not tiles.get((global_x + dx, global_y + height_extent), None) or \
-                        tiles[(global_x + dx, global_y + height_extent)].biome != tile_type or \
-                        visited[global_x + dx, global_y + height_extent]:
-                            extendable = False
-                            break
-                    if extendable:
-                        height_extent += 1
+            # Marquer les tuiles fusionnées comme visitées
+            for dy in range(height):
+                for dx in range(width):
+                    visited.add((global_x + dx, global_y + dy))
 
-                # Marquer les tuiles fusionnées comme visitées
-                visited[global_x:global_x + width_extent, global_y:global_y + height_extent] = True
-
-                # Ajouter le rectangle fusionné
-                rectangles.append((global_x, global_y, width_extent, height_extent, tile_type))
+            # Ajouter le rectangle à la liste des rectangles fusionnés
+            rectangles.append((global_x, global_y, width, height, tile_type))
 
         return rectangles
 
