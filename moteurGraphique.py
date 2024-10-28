@@ -277,6 +277,7 @@ class Camera:
         self.screen_width = config['screen_width']
         self.screen_height = config['screen_height']
         self.screen = pygame.display.set_mode((self.screen_width, self.screen_height))
+        self.font = pygame.font.Font(None, 24)
 
         # Position précédente de la caméra pour détecter le mouvement
         self.previous_camera_position = (-1, -1)
@@ -362,7 +363,9 @@ class Camera:
         # self.screen.fill((135, 206, 235))  # Fond bleu ciel
 
         # Récupérer toutes les tuiles des chunks visibles
-        visible_tiles = self.get_visible_tiles()
+        visible_tiles, width, height = self.get_visible_tiles()
+        
+        # self.render_visible_tiles(visible_tiles)
 
         # Appliquer le greedy meshing sur les tuiles visibles
         rectangles = self.greedy_mesh(visible_tiles)
@@ -392,24 +395,24 @@ class Camera:
                                 (end_y - self.camera_center_y + self.screen_height / 2 / self.scale) * self.scale))
 
         # Ecriture du nombre de chunks chargés
-        font = pygame.font.Font(None, 24)
-        text = font.render(f"Chunks loaded: {len(self.world.loaded_chunks)}", True, (255, 255, 255))
+        text = self.font.render(f"Chunks loaded: {len(self.world.loaded_chunks)}", True, (255, 255, 255))
         self.screen.blit(text, (10, 40))
 
     def get_visible_tiles(self):
         """Récupère toutes les tuiles des chunks visibles avec leurs coordonnées globales."""
-        half_screen_width = self.screen_width // 2
-        half_screen_height = self.screen_height // 2
+        half_screen_width = self.screen_width / 2  # Utiliser une division flottante
+        half_screen_height = self.screen_height / 2
 
         camera_world_x = self.camera_center_x
         camera_world_y = self.camera_center_y
 
+        # Limites exactes en flottant
         left_bound = camera_world_x - half_screen_width / self.scale
         right_bound = camera_world_x + half_screen_width / self.scale
         top_bound = camera_world_y - half_screen_height / self.scale
         bottom_bound = camera_world_y + half_screen_height / self.scale
 
-        # Détermine les coordonnées des chunks visibles
+        # Calcule des chunks visibles
         left_chunk = int(left_bound // self.chunk_size)
         right_chunk = int(right_bound // self.chunk_size)
         top_chunk = int(top_bound // self.chunk_size)
@@ -422,11 +425,15 @@ class Camera:
                 if chunk:
                     for row in chunk.tiles:
                         for tile in row:
-                            global_x = tile.x + chunk_x
-                            global_y = tile.y + chunk_y
+                            global_x = tile.x + chunk_x / self.chunk_size
+                            global_y = tile.y + chunk_y / self.chunk_size
                             visible_tiles[(global_x, global_y)] = tile
+                            
+        # Détermine la largeur et la hauteur du monde visible
+        width = int(right_bound - left_bound)
+        height = int(bottom_bound - top_bound)
 
-        return visible_tiles
+        return visible_tiles, width, height
 
     def greedy_mesh(self, tiles):
         """Applique l'algorithme de greedy meshing sur les tuiles visibles."""
@@ -461,20 +468,100 @@ class Camera:
 
         return rectangles
 
+
+    def greedy_mesh_with_bitmap(self, tiles, width, height):
+        """Greedy meshing optimisé avec une matrice de bitmaps pour marquer les tuiles visitées."""
+        # Déterminer les dimensions du monde
+        if not tiles:
+            return
+        
+        # Créer une matrice de bits avec numpy pour stocker les tuiles visitées
+        visited = np.zeros((width, height), dtype=bool)
+
+        rectangles = []
+
+        for global_y in range(height):
+            for global_x in range(width):
+                # Si la tuile est déjà visitée, passer à la suivante
+                if visited[global_x, global_y]:
+                    continue
+
+                tile = tiles.get((global_x, global_y), None)
+                if tile is None:
+                    continue
+
+                tile_type = tile.biome
+                width_extent, height_extent = 1, 1
+
+                # Étendre en largeur
+                while global_x + width_extent < width and tiles.get((global_x + width_extent, global_y), None) and \
+                    tiles[(global_x + width_extent, global_y)].biome == tile_type and not visited[global_x + width_extent, global_y]:
+                    width_extent += 1
+
+                # Étendre en hauteur
+                extendable = True
+                while extendable and global_y + height_extent < height:
+                    for dx in range(width_extent):
+                        if not tiles.get((global_x + dx, global_y + height_extent), None) or \
+                        tiles[(global_x + dx, global_y + height_extent)].biome != tile_type or \
+                        visited[global_x + dx, global_y + height_extent]:
+                            extendable = False
+                            break
+                    if extendable:
+                        height_extent += 1
+
+                # Marquer les tuiles fusionnées comme visitées
+                visited[global_x:global_x + width_extent, global_y:global_y + height_extent] = True
+
+                # Ajouter le rectangle fusionné
+                rectangles.append((global_x, global_y, width_extent, height_extent, tile_type))
+
+        return rectangles
+
+    def render_visible_tiles(self, tiles):
+        """Rend les tuiles visibles."""
+        for (global_x, global_y), tile in tiles.items():
+            screen_x = (global_x - self.camera_center_x + self.screen_width / 2 / self.scale) * self.scale
+            screen_y = (global_y - self.camera_center_y + self.screen_height / 2 / self.scale) * self.scale
+            screen_width = self.scale
+            screen_height = self.scale
+
+            # Déterminer la couleur en fonction du biome
+            color = (10, 10, 50)
+            for biome in self.config['biomes']:
+                if tile.biome == biome['name']:
+                    color = biome['color']
+                    break
+
+            # Dessiner la tuile
+            pygame.draw.rect(self.screen, color, pygame.Rect(screen_x, screen_y, screen_width, screen_height))
+            pygame.draw.rect(self.screen, (100,100, 100), pygame.Rect(screen_x, screen_y, screen_width, screen_height), 1)
+
     def render_rectangles(self, rectangles):
         """Rend les rectangles optimisés."""
         for rect in rectangles:
             global_x, global_y, width, height, tile_type = rect
-            screen_x = int((global_x - self.camera_center_x + self.screen_width / 2 / self.scale) * self.scale)
-            screen_y = int((global_y - self.camera_center_y + self.screen_height / 2 / self.scale) * self.scale)
-            screen_width = int(width * self.scale)
-            screen_height = int(height * self.scale)
 
-            color = (10, 10, 50)
+            # Calcule en flottant avant conversion
+            screen_x = (global_x - self.camera_center_x + self.screen_width / 2 / self.scale) * self.scale
+            screen_y = (global_y - self.camera_center_y + self.screen_height / 2 / self.scale) * self.scale
+            screen_width = width * self.scale
+            screen_height = height * self.scale
+
+            # Convertir en entier uniquement pour le rendu
+            screen_x = int(np.ceil(screen_x))
+            screen_y = int(np.ceil(screen_y))
+            screen_width = int(np.ceil(screen_width))
+            screen_height = int(np.ceil(screen_height))
+
             # Déterminer la couleur en fonction du biome
+            color = (10, 10, 50)
             for biome in self.config['biomes']:
                 if tile_type == biome['name']:
                     color = biome['color']
                     break
 
-            pygame.draw.rect(self.screen, color, pygame.Rect(screen_x, screen_y, screen_width+20, screen_height+20))
+            # Dessiner le rectangle sans marge ajoutée
+            
+            pygame.draw.rect(self.screen, color, pygame.Rect(screen_x, screen_y, screen_width+1, screen_height+1))
+            pygame.draw.rect(self.screen, (100,100,100), pygame.Rect(screen_x, screen_y, screen_width, screen_height), 1)
