@@ -220,7 +220,8 @@ class Animal(Entity):
         self.wander(delta_time)
         
     def render(self, screen, scale, screen_x, screen_y):
-        return super().render(screen, scale, screen_x, screen_y, color=(0, 255, 0), shape='square')
+        if self.is_alive:
+            return super().render(screen, scale, screen_x, screen_y, color=(0, 200, 0), shape='square')
     
     def __str__(self) -> str:
         return super().__str__() + f" Animal {self.id}"

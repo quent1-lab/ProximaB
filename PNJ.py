@@ -14,8 +14,8 @@ class PNJ(Entity):
         self.path = []
         
         self.needs = {'hunger': 100, 'thirst': 100, 'energy': 100}  # Stocker les besoins dans un dictionnaire
-        self.needs_threshold = {'hunger': 20, 'thirst': 20, 'energy': 30}  # Seuil de besoin pour déclencher une action
-        self.corresponding_actions = {'Food': 'hunter', 'Water': 'thirst'}  # Actions correspondantes pour chaque besoin
+        self.needs_threshold = {'hunger': 99, 'thirst': 20, 'energy': 30}  # Seuil de besoin pour déclencher une action
+        self.corresponding_actions = {'Food': 'hunger', 'Water': 'thirst'}  # Actions correspondantes pour chaque besoin
         self.finding = [] # Stocker les ressources en cours de recherche
         # Initialisation des attributs de cibles pour chaque besoin
         self.target_hunger = None
@@ -109,6 +109,11 @@ class PNJ(Entity):
 
     def search_resource(self, resource_type):
         """Cherche la ressource la plus proche et la cible."""
+        
+        if "Food" in resource_type :
+            # Cherche l'animal le plus proche et le cible
+            self.search_animal(resource_type)
+        
         if getattr(self, f'target_{self.corresponding_actions[resource_type]}'):
             return
         
@@ -126,12 +131,29 @@ class PNJ(Entity):
                 self.set_target(*adjacent_tile)
                 setattr(self, f'target_{self.corresponding_actions[resource_type]}', adjacent_tile)
 
+    def search_animal(self, resource_type):
+        """Cherche l'animal le plus proche et le cible."""
+        
+        list_animal = self.world.entities.get("Animal", [])
+        closest_animal, closest_distance = None, float('inf')
+        for animal in list_animal:
+            distance = self.get_distance_from(animal.x, animal.y)
+            if distance < closest_distance:
+                closest_animal, closest_distance = animal, distance
+                
+        if closest_animal:
+            self.target = (closest_animal.x, closest_animal.y)
+            self.path = [(self.x, self.y), (closest_animal.x, closest_animal.y)]
+        else:
+            print(f"{self} n'a pas trouvé d'animal à chasser.")
+
     def find_water(self):
         """Cherche la source d'eau la plus proche."""
         self.search_resource('Water')
 
     def find_food(self):
         """Cherche la nourriture la plus proche."""
+        # Cherche l'animal le plus proche
         self.search_resource('Food')
 
     def set_target(self, target_x, target_y):
