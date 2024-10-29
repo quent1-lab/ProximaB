@@ -170,6 +170,20 @@ class Animal(Entity):
             self.run_away_from(pnj)  # L'animal fuit si le PNJ est trop proche
         elif distance < 2:
             self.attack(pnj)  # L'animal attaque s'il est carnivore et que le PNJ est trop proche
+    
+    def run_away_from(self, entity):
+        """L'animal fuit de l'entité spécifiée."""
+        dx = self.x - entity.x
+        dy = self.y - entity.y
+        distance = math.sqrt(dx ** 2 + dy ** 2)
+        if distance > 0:
+            self.vx = dx / distance * self.speed
+            self.vy = dy / distance * self.speed
+            super().move()
+    
+    def attack(self, entity):
+        """L'animal attaque l'entité spécifiée."""
+        pass
 
     def generate_random_path(self, num_points, max_distance):
         """Génère un chemin aléatoire avec un nombre de points et une distance maximale."""

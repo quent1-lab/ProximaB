@@ -39,7 +39,7 @@ class PNJ(Entity):
     def update_needs(self, delta_time):
         """Mise à jour des besoins naturels."""
         self.needs['hunger'] -= delta_time * 0.1
-        self.needs['thirst'] -= delta_time * 1
+        self.needs['thirst'] -= delta_time * 0.15
         self.needs['energy'] -= delta_time * 0.05
 
     def perform_task_based_on_need(self, need_type, search_method, action_method, threshold, regeneration_rate):
@@ -87,8 +87,8 @@ class PNJ(Entity):
 
     def perform_tasks(self, delta_time):
         """Effectue les tâches en fonction des besoins."""
-        self.perform_task_based_on_need('hunger', self.find_food, 'consume_food', 20, 20 * delta_time)
-        self.perform_task_based_on_need('thirst', self.find_water, 'consume_water', 90, 20 * delta_time)
+        self.perform_task_based_on_need('hunger', self.find_food, 'consume_food', self.needs_threshold["hunger"], 20 * delta_time)
+        self.perform_task_based_on_need('thirst', self.find_water, 'consume_water', self.needs_threshold["thirst"], 20 * delta_time)
         if self.needs['energy'] < 30:
             self.rest()
 
