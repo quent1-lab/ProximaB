@@ -379,23 +379,26 @@ class Camera:
         # self.screen.fill((135, 206, 235))  # Fond bleu ciel
 
         # Récupère tous les chunks visibles
-        # visible_chunks = self.get_visible_chunks()
+        visible_chunks = self.get_visible_chunks()
         
         rectangles = []
         
-        # for chunk in visible_chunks:
-        #     chunk_x, chunk_y = chunk
-        #     chunk = self.world.get_chunk(chunk_x, chunk_y)
-        #     rectangles.extend(chunk.calculate_mesh(self.greedy_mesh_optimized))
-        
+        for chunk in visible_chunks:
+            chunk_x, chunk_y = chunk
+            chunk = self.world.get_chunk(chunk_x, chunk_y)
+            rectangle = chunk.calculate_mesh(self.greedy_mesh_chunk)
+            
+            # Ajouter l'offset du chunk pour le rendu
+            for x, y, w, h, tile_type in rectangle:
+                rectangles.append((x + chunk_x * self.chunk_size, y + chunk_y * self.chunk_size, w, h, tile_type))
+                
         # Récupérer toutes les tuiles des chunks visibles
-        visible_tiles, width, height = self.get_visible_tiles()
-        
+        # visible_tiles, width, height = self.get_visible_tiles()
         # self.render_visible_tiles(visible_tiles)
 
         # Appliquer le greedy meshing sur les tuiles visibles
-        #rectangles = self.greedy_mesh(visible_tiles)
-        rectangles = self.greedy_mesh_optimized(visible_tiles)
+        # rectangles = self.greedy_mesh(visible_tiles)
+        # rectangles = self.greedy_mesh_optimized(visible_tiles)
 
         # Rendre les rectangles optimisés
         self.render_rectangles(rectangles)
@@ -561,6 +564,45 @@ class Camera:
 
         return rectangles
 
+    def greedy_mesh_chunk(self, tiles):
+        """Applique l'algorithme de greedy meshing sur les tuiles d'un chunk."""
+        chunk_size = len(tiles)
+        visited = [[False] * chunk_size for _ in range(chunk_size)]
+        rectangles = []
+
+        for x in range(chunk_size):
+            for y in range(chunk_size):
+                if visited[x][y]:
+                    continue
+
+                tile_type = tiles[x][y].biome
+                width, height = 1, 1
+
+                # Étendre en largeur tant que les tuiles adjacentes sont du même type
+                while x + width < chunk_size and tiles[x + width][y].biome == tile_type and not visited[x + width][y]:
+                    width += 1
+
+                # Étendre verticalement si toutes les tuiles dans la rangée ont le même type
+                extendable = True
+                while extendable:
+                    for dx in range(width):
+                        if y + height >= chunk_size or tiles[x + dx][y + height].biome != tile_type or visited[x + dx][y + height]:
+                            extendable = False
+                            break
+                    if extendable:
+                        height += 1
+
+                # Marquer les tuiles comme visitées
+                for dx in range(width):
+                    for dy in range(height):
+                        visited[x + dx][y + dy] = True
+
+                # Ajouter le rectangle à la liste
+                rectangles.append((x, y, width, height, tile_type))
+
+        return rectangles
+            
+    
     def render_visible_tiles(self, tiles):
         """Rend les tuiles visibles."""
         for (global_x, global_y), tile in tiles.items():
@@ -607,4 +649,4 @@ class Camera:
             # Dessiner le rectangle sans marge ajoutée
             
             pygame.draw.rect(self.screen, color, pygame.Rect(screen_x, screen_y, screen_width+1, screen_height+1))
-            pygame.draw.rect(self.screen, (100,100,100), pygame.Rect(screen_x, screen_y, screen_width, screen_height), 1)
+            # pygame.draw.rect(self.screen, (100,100,100), pygame.Rect(screen_x, screen_y, screen_width, screen_height), 1)
