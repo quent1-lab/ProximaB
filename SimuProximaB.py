@@ -2,6 +2,7 @@ import pygame, random, json, threading, time
 from moteurGraphique import Camera, World
 from entity import Food, Animal
 from PNJ import PNJ
+from event import EventManager
 
 # Charger la configuration depuis un fichier JSON
 def load_config(file_path):
@@ -121,6 +122,8 @@ class Simulation:
         self.delta_time = 1/60
         self.is_running = True
         
+        self.event_manager = world.event_manager
+        
     def initialize_simulation(self):
         """Initialiser les entités, les chunks, etc."""
         # Ajouter des entités
@@ -189,8 +192,11 @@ def main2():
     # Initialiser Pygame
     pygame.init()
 
+    # Créer le manager d'événements
+    event_manager = EventManager()
+    
     # Créer le monde et la caméra
-    world = World(config, chunk_lock=chunk_lock, entity_lock=entity_lock)
+    world = World(config, chunk_lock=chunk_lock, entity_lock=entity_lock, event_manager=event_manager)
     camera = Camera(world, config, mode="free")
     
     sim = Simulation(world, camera)

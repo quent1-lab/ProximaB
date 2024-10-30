@@ -43,6 +43,7 @@ class World:
         self.__dict__.update(kwargs)
         self.chunk_lock = self.__dict__.get("chunk_lock", None)
         self.entity_lock = self.__dict__.get("entity_lock", None)
+        self.event_manager = self.__dict__.get("event_manager", None)
         
         self.chunk_file = f'data/chunks_{config["perlin"]['seed']}_{config["perlin"]['octaves']}.json'  # Fichier pour stocker les chunks
         self.init_loaded_chunks(config['initial_chunk_radius'])
@@ -126,6 +127,8 @@ class World:
     
     def add_entity(self, entity):
         """Ajoute une entité au monde."""
+        entity.register_for_events()
+        
         if entity.entity_type not in self.entities:
             self.entities[entity.entity_type] = []
         self.entities[entity.entity_type].append(entity)

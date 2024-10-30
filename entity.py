@@ -15,6 +15,24 @@ class Entity:
         self.friction_coefficient = 0.1  # Coefficient de frottement par défaut
         self.on_ground = False  # Indique si l'entité est au sol
         self.in_water = False  # Indique si l'entité est dans l'eau
+        
+        self.event_manager = world.event_manager
+    
+    def on_event(self, event):
+        if event.type == "interaction" and event.target == self:
+            self.handle_interaction(event)
+        elif event.type == "collision" and event.target == self:
+            self.handle_collision(event)
+
+    def handle_interaction(self, event):
+        print(f"{self.name} interagit avec {event.source.name} avec des données: {event.data}")
+
+    def handle_collision(self, event):
+        print(f"{self.name} a une collision avec {event.source.name}")
+
+    def register_for_events(self):
+        self.event_manager.register_listener("interaction", self.on_event)
+        self.event_manager.register_listener("collision", self.on_event)
     
     def apply_gravity(self, delta_time):
         """Applique la gravité si l'entité n'est pas au sol."""
