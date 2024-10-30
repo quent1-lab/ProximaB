@@ -2,19 +2,22 @@ import random, pygame, math, heapq
 
 class Entity:
     """Classe représentant une entité générique dans le monde."""
-    def __init__(self, x, y, world, config, size=1.0, entity_type="generic"):
+    def __init__(self, x, y, world, size=1.0, entity_type="generic"):
+        self.id = world.generate_id()  # Identifiant unique de l'entité
         self.x = x
         self.y = y
         self.vx = 0  # Vitesse horizontale
         self.vy = 0  # Vitesse verticale (affectée par la gravité)
         self.size = size  # Taille de l'entité
         self.world = world
-        self.config = config
+        self.config = world.config
         self.entity_type = entity_type  # Type d'entité (PNJ, Animal, Arbre, etc.)
         self.gravity = 9.81  # Gravité (m/s^2)
         self.friction_coefficient = 0.1  # Coefficient de frottement par défaut
         self.on_ground = False  # Indique si l'entité est au sol
         self.in_water = False  # Indique si l'entité est dans l'eau
+        
+        self.health = 100  # Points de vie de l'entité
         
         self.event_manager = world.event_manager
     
@@ -23,6 +26,8 @@ class Entity:
             self.handle_interaction(event)
         elif event.type == "collision" and event.target == self:
             self.handle_collision(event)
+        elif event.type == "attack" and event.target == self:
+            self.handle_attack(event)
 
     def handle_interaction(self, event):
         print(f"{self.name} interagit avec {event.source.name} avec des données: {event.data}")
@@ -30,9 +35,16 @@ class Entity:
     def handle_collision(self, event):
         print(f"{self.name} a une collision avec {event.source.name}")
 
+    def handle_attack(self, event):
+        self.health -= event.data["damage"]
+        print(f"{self.name} a été attaqué et a perdu {event.data['damage']} points de vie.")
+        if self.health <= 0:
+            self.die()
+
     def register_for_events(self):
         self.event_manager.register_listener("interaction", self.on_event)
         self.event_manager.register_listener("collision", self.on_event)
+        self.event_manager.register_listener("attack", self.on_event)
     
     def apply_gravity(self, delta_time):
         """Applique la gravité si l'entité n'est pas au sol."""
@@ -123,10 +135,10 @@ class Entity:
 
 class Animal(Entity):
     def __init__(self, name, x, y, world, energy=100, hunger=100, thirst=100):
-        super().__init__(x, y, world, world.config, entity_type="animal")
+        super().__init__(x, y, world, entity_type="animal")
         self.name = name
         self.is_alive = True
-        self.speed = 1.0  # Vitesse de déplacement de base
+        self.speed = 0.6  # Vitesse de déplacement de base
         self.intelligence = 0.5  # Niveau d'intelligence de l'animal (peut influencer ses décisions)
         self.direction = (random.uniform(-1, 1), random.uniform(-1, 1))
         self.normalize_direction()
@@ -179,6 +191,7 @@ class Animal(Entity):
         """L'animal meurt."""
         self.is_alive = False
         # Logique pour enlever l'animal du monde
+        print(f"{self.name} est mort.")
         pass
     
     def react_to_pnj(self, pnj):
@@ -242,7 +255,7 @@ class Animal(Entity):
             return super().render(screen, scale, screen_x, screen_y, color=(0, 200, 0), shape='square')
     
     def __str__(self) -> str:
-        return super().__str__() + f" Animal {self.id}"
+        return super().__str__() + f" Animal {self.name}"
 
 class Food(Entity):
     def __init__(self, name, nutrition_value, x, y, world):
@@ -315,6 +328,7 @@ class Pathfinding:
             iterations += 1
             _, current = heapq.heappop(open_set)
             if current == goal:
+                print(f"Chemin trouvé après {iterations} itérations.")
                 path = self.simplify_path(self.reconstruct_path(came_from, current))
                 if path[0] == start:
                     path.pop(0)  # Enlève le point de départ
@@ -330,7 +344,7 @@ class Pathfinding:
                     g_score[neighbor] = tentative_g_score
                     f_score[neighbor] = tentative_g_score + self.heuristic(neighbor, goal)
                     heapq.heappush(open_set, (f_score[neighbor], neighbor))
-
+        
         if path_found:
             return path
         else:

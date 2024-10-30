@@ -28,3 +28,7 @@ class InteractionEvent(Event):
 class CollisionEvent(Event):
     def __init__(self, source, target, impact_force=None):
         super().__init__("collision", source, target, {"impact_force": impact_force})
+
+class AttackEvent(Event):
+    def __init__(self, source, target, damage):
+        super().__init__("attack", source, target, {"damage": damage})

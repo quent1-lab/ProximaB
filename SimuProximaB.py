@@ -105,9 +105,8 @@ def generate_animals_in_world(world, max_animals_per_chunk=2, radius=1):
         # Vérifie si la position est déjà occupée par une entité et que la tuile est de type "Plaine"
         if (x, y) not in entity_positions and tile.biome == "Plains":
             animal = Animal("vache",  x=x, y=y, world=world)
-            tile.set_entity_presence(animal)
+            #tile.set_entity_presence(animal)
             world.add_entity(animal)
-            print(f"Un animal a été ajouté à la tuile {tile.x}, {tile.y}.")
             return
     
 # Gestion des verrous pour éviter les conflits sur les accès aux données partagées
@@ -127,9 +126,9 @@ class Simulation:
     def initialize_simulation(self):
         """Initialiser les entités, les chunks, etc."""
         # Ajouter des entités
-        pnj1 = PNJ(5, 10, self.world, self.world.config, id=self.world.generate_id(), size=1.6)
+        pnj1 = PNJ(5, 10, self.world, size=1.6)
         self.world.add_entity(pnj1)
-        pnj2 = PNJ(12, 15, self.world, self.world.config, id=self.world.generate_id(), size=1.8)
+        pnj2 = PNJ(12, 15, self.world, size=1.8)
         self.world.add_entity(pnj2)
 
     def start_simulation(self):

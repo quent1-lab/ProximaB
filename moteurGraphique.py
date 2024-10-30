@@ -152,16 +152,16 @@ class World:
     
     def update_entities(self, delta_time):
         """Met à jour toutes les entités du monde."""
-        for entity_type, entity_list in self.entities.items():
+        for entity_list in self.entities.values():
             self.tiles_with_entities = []  # Liste des tuiles ayant des entités
             for entity in entity_list:
                 entity.update(delta_time)
         
         # Vérifier la présence des entités sur les tuiles
-        self.entity_is_present()
+        #self.entity_is_present()
         
         # Vérifier la présence des entités sur les tuiles
-        self.entity_is_not_present()
+        #self.entity_is_not_present()
    
     def search_for_entities(self, x, y, radius, entity_type):
         """Recherche des entités dans un rayon donné autour des coordonnées (x, y)."""

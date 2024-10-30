@@ -1,12 +1,12 @@
 from entity import Entity, Pathfinding
 from task import Task, TaskManager
 import math, threading
+from event import AttackEvent
 
 class PNJ(Entity):
     """Classe représentant un PNJ."""
-    def __init__(self, x, y, world, config, id, size=1.75, speed=1.0):
-        super().__init__(x, y, world, config, size, entity_type="PNJ")
-        self.id = id
+    def __init__(self, x, y, world, size=1.75, speed=1.0):
+        super().__init__(x, y, world, size, entity_type="PNJ")
         self.name = self.init_name()
         self.speed = speed
         self.target = None
@@ -42,7 +42,7 @@ class PNJ(Entity):
         self.needs['thirst'] -= delta_time * 0.15
         self.needs['energy'] -= delta_time * 0.05
 
-    def perform_task_based_on_need(self, need_type, search_method, action_method, threshold, regeneration_rate):
+    def perform_task_based_on_need(self, need_type, search_method, move_method, action_method, threshold, regeneration_rate):
         """Généralise la gestion des tâches en fonction des besoins avec gestion d'attente."""
         
         # Vérification de la satisfaction du besoin
@@ -54,7 +54,7 @@ class PNJ(Entity):
                     # Une fois la ressource trouvée, créer une tâche pour s'y rendre
                     go_to_task = Task(
                         name=f"Aller à {need_type}",
-                        action=self.move_to_target,
+                        action=getattr(self, move_method),
                         priority=100,
                         energy_cost=2
                     )
@@ -80,6 +80,18 @@ class PNJ(Entity):
             self.move(delta_time)
             if self.is_arrived(self.target):
                 self.task_manager.set_task_completed()
+    
+    def move_to_entity(self, delta_time):
+        """Déplacement vers une entité."""
+        entity = self.target_hunger
+        #self.set_target(entity.x, entity.y)
+        self.path = [(entity.x, entity.y)]
+        self.move(delta_time)
+        
+        if self.get_distance_from(entity.x, entity.y) < 0.5:
+            # Attaque l'animal
+            print(f"{self} attaque {entity}.")
+            self.attack(entity)
                 
     def is_at_target(self, target, tol=0.1):
         """Vérifie si le PNJ est arrivé à la cible."""
@@ -87,8 +99,8 @@ class PNJ(Entity):
 
     def perform_tasks(self, delta_time):
         """Effectue les tâches en fonction des besoins."""
-        self.perform_task_based_on_need('hunger', self.find_food, 'consume_food', self.needs_threshold["hunger"], 20 * delta_time)
-        self.perform_task_based_on_need('thirst', self.find_water, 'consume_water', self.needs_threshold["thirst"], 20 * delta_time)
+        self.perform_task_based_on_need('hunger', self.find_food, "move_to_entity",'consume_food', self.needs_threshold["hunger"], 20 * delta_time)
+        self.perform_task_based_on_need('thirst', self.find_water, "move_to_target",'consume_water', self.needs_threshold["thirst"], 20 * delta_time)
         if self.needs['energy'] < 30:
             self.rest()
 
@@ -107,6 +119,15 @@ class PNJ(Entity):
         if self.needs['hunger'] >= 100:
             self.target_hunger = None
 
+    def attack(self, entity):
+        """Attaque une entité."""
+        self.event_manager.emit_event(AttackEvent(self, entity, 10))
+        if entity.health <= 0:
+            self.target_hunger = None
+            self.task_manager.current_task.complete()
+            setattr(self, f'target_{self.corresponding_actions["Food"]}', None)
+            self.world.remove_entity(entity)
+    
     def search_resource(self, resource_type):
         """Cherche la ressource la plus proche et la cible."""
         
@@ -134,16 +155,18 @@ class PNJ(Entity):
     def search_animal(self, resource_type):
         """Cherche l'animal le plus proche et le cible."""
         
-        list_animal = self.world.entities.get("Animal", [])
+        list_animal = self.world.entities.get("animal", [])
         closest_animal, closest_distance = None, float('inf')
         for animal in list_animal:
             distance = self.get_distance_from(animal.x, animal.y)
-            if distance < closest_distance:
+            tile_animal = self.world.get_tile_at(animal.x, animal.y)
+            if distance < closest_distance and tile_animal.biome != "Water":
                 closest_animal, closest_distance = animal, distance
                 
         if closest_animal:
-            self.target = (closest_animal.x, closest_animal.y)
-            self.path = [(self.x, self.y), (closest_animal.x, closest_animal.y)]
+            print(f"Distance de {animal} : {distance} - Biome : {tile_animal.biome}")
+            self.set_target(closest_animal.x, closest_animal.y)
+            setattr(self, f'target_{self.corresponding_actions[resource_type]}', closest_animal)
         else:
             print(f"{self} n'a pas trouvé d'animal à chasser.")
 
@@ -176,13 +199,6 @@ class PNJ(Entity):
                 self.vx = (dx / distance) * self.speed
                 self.vy = (dy / distance) * self.speed
                 super().move(delta_time)
-            
-            # if math.isclose(self.x, next_pos[0], abs_tol=0.1) and math.isclose(self.y, next_pos[1], abs_tol=0.1):
-            #     print(f"{self} est arrivé à la case {next_pos}.")
-            #     last_tile = self.path.pop(0)
-            #     if len(self.path) == 0:
-            #         self.target = None
-            #         self.world.get_tile_at(*last_tile).set_entity_destination(None)
     
     def check_adjacent_tiles_for_resource(self, resource_type):
         """Vérifie si une ressource est présente dans les cases adjacentes au PNJ."""
