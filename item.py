@@ -1,8 +1,24 @@
+import pygame
+
 class Item:
     def __init__(self, name, weight=1, quantity=1):
         self.name = name
         self.weight = weight
         self.quantity = quantity
+    
+    def render(self, screen, screen_x, screen_y, scale = 0.5, color=(100, 0, 100), shape='circle', **kwargs):
+        """Affiche graphiquement l'item sur l'écran avec des options de personnalisation."""
+        # Convertir la position en pixels en fonction de l'échelle
+        size_in_pixels = int(scale * 5)
+
+        # Dessiner l'entité en fonction de la forme spécifiée
+        if shape == 'circle':
+            pygame.draw.circle(screen, color, (screen_x, screen_y), size_in_pixels // 2)
+        elif shape == 'square':
+            pygame.draw.rect(screen, color, (screen_x - size_in_pixels // 2, screen_y - size_in_pixels // 2, size_in_pixels, size_in_pixels))
+        # Ajouter d'autres formes si nécessaire
+        else:
+            raise ValueError(f"Forme non supportée: {shape}")
 
     def __repr__(self):
         return f"{self.name} (x{self.quantity})"

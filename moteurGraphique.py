@@ -255,23 +255,13 @@ class World:
         if tile in self.tiles_with_entities:
             self.tiles_with_entities.remove(tile)
 
-    def add_item_to_chunk(self, item, chunk_x, chunk_y):
-        chunk_id = (chunk_x, chunk_y)
-        if chunk_id not in self.chunks:
-            self.chunks[chunk_id] = {'entities': [], 'items': []}
-        self.chunks[chunk_id]['items'].append(item)
+    def drop_item_in_world(self, entity, item_name, quantity=1):
+        chunk = self.get_chunk((entity.x, entity.y))
+        entity.drop_item(item_name, chunk, quantity)
 
-    def get_items_near_entity(self, entity):
-        """Retourne les items dans les chunks autour de l'entité."""
-        nearby_items = []
-        chunk_x, chunk_y = entity.chunk_position()  # Fonction pour obtenir le chunk de l'entité
-        # Vérifie les chunks autour de l'entité
-        for dx in range(-1, 2):
-            for dy in range(-1, 2):
-                chunk_id = (chunk_x + dx, chunk_y + dy)
-                if chunk_id in self.chunks:
-                    nearby_items.extend(self.chunks[chunk_id]['items'])
-        return nearby_items
+    def pick_up_item_in_world(self, entity, item_name, quantity=1):
+        chunk = self.get_chunk((entity.x, entity.y))
+        return entity.pick_up_item(chunk, item_name, quantity)
 
 # ======================================================================================
 # ================================= Class CAMERA =======================================
@@ -402,11 +392,13 @@ class Camera:
         visible_chunks = self.get_visible_chunks()
         
         rectangles = []
+        items = []
         
         for chunk in visible_chunks:
             chunk_x, chunk_y = chunk
             chunk = self.world.get_chunk(chunk_x, chunk_y)
             rectangle = chunk.calculate_mesh(self.greedy_mesh_chunk)
+            items.append(chunk.dropped_items)
             
             # Ajouter l'offset du chunk pour le rendu
             for x, y, w, h, tile_type in rectangle:
@@ -422,7 +414,16 @@ class Camera:
 
         # Rendre les rectangles optimisés
         self.render_rectangles(rectangles)
-
+        
+        # Affichage des items droppés
+        for dropped_items in items:
+            for dropped_item in dropped_items:
+                # Affichage en fonction de la position dans le monde et de la position de la caméra
+                screen_x = dropped_item.position[0] - self.camera_center_x
+                screen_y = dropped_item.position[1] - self.camera_center_y
+                # Remplacer par un affichage de sprite ou autre représentation visuelle
+                dropped_item.item.render(self.screen, screen_x, screen_y)
+        
         # Afficher les PNJ
         for entity_list in self.world.entities.values():
             for entity in entity_list:
@@ -622,7 +623,6 @@ class Camera:
 
         return rectangles
             
-    
     def render_visible_tiles(self, tiles):
         """Rend les tuiles visibles."""
         for (global_x, global_y), tile in tiles.items():

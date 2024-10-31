@@ -14,7 +14,7 @@ class PNJ(Entity):
         self.path = []
         
         self.needs = {'hunger': 100, 'thirst': 100, 'energy': 100}  # Stocker les besoins dans un dictionnaire
-        self.needs_threshold = {'hunger': 20, 'thirst': 40, 'energy': 30}  # Seuil de besoin pour déclencher une action
+        self.needs_threshold = {'hunger': 80, 'thirst': 95, 'energy': 30}  # Seuil de besoin pour déclencher une action
         self.corresponding_actions = {'Food': 'hunger', 'Water': 'thirst'}  # Actions correspondantes pour chaque besoin
         self.finding = [] # Stocker les ressources en cours de recherche
         # Initialisation des attributs de cibles pour chaque besoin

@@ -1,5 +1,5 @@
 import random, pygame, math, heapq
-from item import Inventory
+from item import Inventory, DroppedItem
 
 class Entity:
     """Classe représentant une entité générique dans le monde."""
@@ -26,17 +26,22 @@ class Entity:
         self.resource_inventory = Inventory(float('inf'))     # Pour les ressources propres de l'entité
         for resource in resources:
             self.resource_inventory.add_item(resource)
-        self.holding_item = None  # Objet actuellement tenu dans la main
-        
-    def drop_item(self, item_name):
+        self.holding_item = None
+
+    def drop_item(self, item_name, chunk, quantity=1):
         if self.storage_inventory.has_item(item_name):
-            item = self.storage_inventory.items[item_name]
-            self.storage_inventory.remove_item(item_name)
-            return item
+            dropped_item = self.storage_inventory.remove_item(item_name, quantity)
+            if dropped_item:
+                chunk.add_dropped_item(DroppedItem(dropped_item, (self.x, self.y)))
+                return dropped_item
         return None
 
-    def pick_up_item(self, item):
-        self.storage_inventory.add_item(item)
+    def pick_up_item(self, chunk, item_name, quantity=1):
+        dropped_item = chunk.remove_dropped_item(item_name, quantity)
+        if dropped_item:
+            self.storage_inventory.add_item(dropped_item.item)
+            return dropped_item
+        return None
 
     def set_holding_item(self, item_name):
         if self.storage_inventory.has_item(item_name):

@@ -65,6 +65,8 @@ class Chunk:
         self.tiles = None
         self.mesh_cache = None
         
+        self.dropped_items = []
+        
         if not loaded:
             self.tiles = self.generate_chunk(noise_generator, config)
     
@@ -146,6 +148,20 @@ class Chunk:
         """Mélange deux biomes en fonction du facteur de mixage."""
         return biome1 if mix_factor < 0.5 else biome2
     
+    def add_dropped_item(self, dropped_item):
+        self.dropped_items.append(dropped_item)
+
+    def remove_dropped_item(self, item_name, quantity=1):
+        for dropped_item in self.dropped_items:
+            if dropped_item.item.name == item_name:
+                if dropped_item.item.quantity > quantity:
+                    dropped_item.item.quantity -= quantity
+                    return dropped_item
+                else:
+                    self.dropped_items.remove(dropped_item)
+                    return dropped_item
+        return None
+    
     def calculate_mesh(self, greedy_mesh):
         if self.mesh_cache is not None:
             return self.mesh_cache
@@ -171,5 +187,8 @@ class Chunk:
         chunk.tiles = [[Tile.from_dict(tile_data, config) for tile_data in row] for row in data['tiles']]
         return chunk
 
+    def __repr__(self):
+        return f"Chunk ({self.x}, {self.y}) with items: {self.dropped_items}"
+    
     def __str__(self) -> str:
         return f"Chunk {self.x_offset}, {self.y_offset}"
