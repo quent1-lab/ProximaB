@@ -1,6 +1,6 @@
 from entity import Entity, Pathfinding
 from task import Task, TaskManager
-import math, threading
+import math, threading, time
 from event import AttackEvent
 
 class PNJ(Entity):
@@ -20,6 +20,9 @@ class PNJ(Entity):
         # Initialisation des attributs de cibles pour chaque besoin
         self.target_hunger = None
         self.target_thirst = None
+        
+        self.last_attack_time = 0  # Temps de la dernière attaque
+        self.attack_cooldown = 1.0  # Délai entre les attaques en secondes
         
         self.collaborators = []  
         self.task_manager = TaskManager(self)
@@ -90,7 +93,6 @@ class PNJ(Entity):
         
         if self.get_distance_from(entity.x, entity.y) < 0.5:
             # Attaque l'animal
-            print(f"{self} attaque {entity}.")
             self.attack(entity)
                 
     def is_at_target(self, target, tol=0.1):
@@ -115,18 +117,21 @@ class PNJ(Entity):
 
     def consume_food(self,delta_time, regeneration_rate):
         """Mange pour récupérer de la faim."""
-        self.needs['hunger'] += regeneration_rate
+        self.needs['hunger'] += regeneration_rate * delta_time
         if self.needs['hunger'] >= 100:
+            print(f"{self} a mangé.")
             self.target_hunger = None
 
     def attack(self, entity):
         """Attaque une entité."""
-        self.event_manager.emit_event(AttackEvent(self, entity, 10))
-        if entity.health <= 0:
-            self.target_hunger = None
-            self.task_manager.current_task.complete()
-            setattr(self, f'target_{self.corresponding_actions["Food"]}', None)
-            self.world.remove_entity(entity)
+        current_time = time.time()
+        if current_time - self.last_attack_time >= self.attack_cooldown:
+            self.event_manager.emit_event(AttackEvent(self, entity, 10))
+            self.last_attack_time = current_time  # Mettre à jour le temps de la dernière attaque
+            if entity.health <= 0:
+                self.target_hunger = None
+                self.task_manager.current_task.complete()
+                #self.world.remove_entity(entity)
     
     def search_resource(self, resource_type):
         """Cherche la ressource la plus proche et la cible."""

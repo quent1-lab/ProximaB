@@ -139,12 +139,11 @@ class World:
         chunk = self.get_chunk(chunk_x, chunk_y)
         chunk.add_entity(entity.entity_type)
     
-    def remove_entity(self, entity_id):
+    def remove_entity(self, entity):
         """Supprime une entité du monde."""
-        for entity_type, entity_list in self.entities.items():
-            for i, entity in enumerate(entity_list):
-                if entity.id == entity_id:
-                    del entity_list[i]
+        for key, entity_list in self.entities.items():
+            if entity in entity_list:
+                self.entities[key].remove(entity)
     
     def generate_id(self):
         """Génère un ID unique pour une entité."""

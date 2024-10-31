@@ -192,7 +192,8 @@ class Animal(Entity):
         self.is_alive = False
         # Logique pour enlever l'animal du monde
         print(f"{self.name} est mort.")
-        pass
+        # Supprimer l'animal du monde
+        self.world.remove_entity(self)
     
     def react_to_pnj(self, pnj):
         """Réaction de l'animal en fonction de la proximité avec un PNJ."""
