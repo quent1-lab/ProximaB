@@ -255,6 +255,24 @@ class World:
         if tile in self.tiles_with_entities:
             self.tiles_with_entities.remove(tile)
 
+    def add_item_to_chunk(self, item, chunk_x, chunk_y):
+        chunk_id = (chunk_x, chunk_y)
+        if chunk_id not in self.chunks:
+            self.chunks[chunk_id] = {'entities': [], 'items': []}
+        self.chunks[chunk_id]['items'].append(item)
+
+    def get_items_near_entity(self, entity):
+        """Retourne les items dans les chunks autour de l'entité."""
+        nearby_items = []
+        chunk_x, chunk_y = entity.chunk_position()  # Fonction pour obtenir le chunk de l'entité
+        # Vérifie les chunks autour de l'entité
+        for dx in range(-1, 2):
+            for dy in range(-1, 2):
+                chunk_id = (chunk_x + dx, chunk_y + dy)
+                if chunk_id in self.chunks:
+                    nearby_items.extend(self.chunks[chunk_id]['items'])
+        return nearby_items
+
 # ======================================================================================
 # ================================= Class CAMERA =======================================
 # ======================================================================================

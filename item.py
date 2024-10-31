@@ -7,6 +7,15 @@ class Item:
     def __repr__(self):
         return f"{self.name} (x{self.quantity})"
 
+class DroppedItem:
+    def __init__(self, item, position):
+        self.item = item
+        self.position = position  # Position (x, y) dans le monde
+
+    def __repr__(self):
+        return f"Dropped {self.item} at {self.position}"
+
+
 class Inventory:
     def __init__(self, capacity):
         self.capacity = capacity
