@@ -1,8 +1,9 @@
 import random, pygame, math, heapq
+from item import Inventory
 
 class Entity:
     """Classe représentant une entité générique dans le monde."""
-    def __init__(self, x, y, world, size=1.0, entity_type="generic"):
+    def __init__(self, x, y, world, size=1.0, entity_type="generic", storage_capacity = 10, resources = []):
         self.id = world.generate_id()  # Identifiant unique de l'entité
         self.x = x
         self.y = y
@@ -20,6 +21,26 @@ class Entity:
         self.health = 100  # Points de vie de l'entité
         
         self.event_manager = world.event_manager
+        
+        self.storage_inventory = Inventory(storage_capacity)  # Pour les objets stockés
+        self.resource_inventory = Inventory(float('inf'))     # Pour les ressources propres de l'entité
+        for resource in resources:
+            self.resource_inventory.add_item(resource)
+        self.holding_item = None  # Objet actuellement tenu dans la main
+        
+    def drop_item(self, item_name):
+        if self.storage_inventory.has_item(item_name):
+            item = self.storage_inventory.items[item_name]
+            self.storage_inventory.remove_item(item_name)
+            return item
+        return None
+
+    def pick_up_item(self, item):
+        self.storage_inventory.add_item(item)
+
+    def set_holding_item(self, item_name):
+        if self.storage_inventory.has_item(item_name):
+            self.holding_item = self.storage_inventory.items[item_name]
     
     def on_event(self, event):
         if event.type == "interaction" and event.target == self:
@@ -138,6 +159,9 @@ class Entity:
     
     def __str__(self) -> str:
         return f"{self.entity_type} at ({self.x:.1f}, {self.y:.1f})"
+
+    def __repr__(self):
+        return f"{self.name}: Storage - {self.storage_inventory}, Resources - {self.resource_inventory}, Holding - {self.holding_item}"
 
 class Animal(Entity):
     def __init__(self, name, x, y, world, energy=100, hunger=100, thirst=100):
