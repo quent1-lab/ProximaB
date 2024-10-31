@@ -32,3 +32,7 @@ class CollisionEvent(Event):
 class AttackEvent(Event):
     def __init__(self, source, target, damage):
         super().__init__("attack", source, target, {"damage": damage})
+
+class DeathEvent(Event):
+    def __init__(self, source, target):
+        super().__init__("death", source, target)

@@ -14,7 +14,7 @@ class PNJ(Entity):
         self.path = []
         
         self.needs = {'hunger': 100, 'thirst': 100, 'energy': 100}  # Stocker les besoins dans un dictionnaire
-        self.needs_threshold = {'hunger': 99, 'thirst': 20, 'energy': 30}  # Seuil de besoin pour déclencher une action
+        self.needs_threshold = {'hunger': 20, 'thirst': 40, 'energy': 30}  # Seuil de besoin pour déclencher une action
         self.corresponding_actions = {'Food': 'hunger', 'Water': 'thirst'}  # Actions correspondantes pour chaque besoin
         self.finding = [] # Stocker les ressources en cours de recherche
         # Initialisation des attributs de cibles pour chaque besoin
@@ -41,8 +41,8 @@ class PNJ(Entity):
 
     def update_needs(self, delta_time):
         """Mise à jour des besoins naturels."""
-        self.needs['hunger'] -= delta_time * 0.1
-        self.needs['thirst'] -= delta_time * 0.15
+        self.needs['hunger'] -= delta_time * 0.3
+        self.needs['thirst'] -= delta_time * 0.4
         self.needs['energy'] -= delta_time * 0.05
 
     def perform_task_based_on_need(self, need_type, search_method, move_method, action_method, threshold, regeneration_rate):
@@ -87,7 +87,11 @@ class PNJ(Entity):
     def move_to_entity(self, delta_time):
         """Déplacement vers une entité."""
         entity = self.target_hunger
-        #self.set_target(entity.x, entity.y)
+        
+        if not entity.is_alive:
+            self.task_manager.set_task_completed()
+            return
+        
         self.path = [(entity.x, entity.y)]
         self.move(delta_time)
         
@@ -109,7 +113,6 @@ class PNJ(Entity):
     def consume_water(self,delta_time, regeneration_rate):
         """Boit de l'eau pour se réhydrater."""
         self.needs['thirst'] += regeneration_rate
-        self.needs['energy'] -= 0.1
         if self.needs['thirst'] >= 100:
             self.target_thirst = None
             self.task_manager.current_task.complete()
@@ -117,10 +120,10 @@ class PNJ(Entity):
 
     def consume_food(self,delta_time, regeneration_rate):
         """Mange pour récupérer de la faim."""
-        self.needs['hunger'] += regeneration_rate * delta_time
+        self.needs['hunger'] += regeneration_rate * delta_time * 4
         if self.needs['hunger'] >= 100:
-            print(f"{self} a mangé.")
             self.target_hunger = None
+            self.task_manager.current_task.complete()
 
     def attack(self, entity):
         """Attaque une entité."""
@@ -128,9 +131,8 @@ class PNJ(Entity):
         if current_time - self.last_attack_time >= self.attack_cooldown:
             self.event_manager.emit_event(AttackEvent(self, entity, 10))
             self.last_attack_time = current_time  # Mettre à jour le temps de la dernière attaque
-            if entity.health <= 0:
-                self.target_hunger = None
-                self.task_manager.current_task.complete()
+            if not entity.is_alive:
+                self.task_manager.set_task_completed()
                 #self.world.remove_entity(entity)
     
     def search_resource(self, resource_type):
@@ -163,10 +165,11 @@ class PNJ(Entity):
         list_animal = self.world.entities.get("animal", [])
         closest_animal, closest_distance = None, float('inf')
         for animal in list_animal:
-            distance = self.get_distance_from(animal.x, animal.y)
-            tile_animal = self.world.get_tile_at(animal.x, animal.y)
-            if distance < closest_distance and tile_animal.biome != "Water":
-                closest_animal, closest_distance = animal, distance
+            if animal.is_alive:
+                distance = self.get_distance_from(animal.x, animal.y)
+                tile_animal = self.world.get_tile_at(animal.x, animal.y)
+                if distance < closest_distance and tile_animal.biome != "Water":
+                    closest_animal, closest_distance = animal, distance
                 
         if closest_animal:
             print(f"Distance de {animal} : {distance} - Biome : {tile_animal.biome}")

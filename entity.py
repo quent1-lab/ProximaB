@@ -28,6 +28,8 @@ class Entity:
             self.handle_collision(event)
         elif event.type == "attack" and event.target == self:
             self.handle_attack(event)
+        elif event.type == "death" and event.target == self:
+            self.handle_death(event)
 
     def handle_interaction(self, event):
         print(f"{self.name} interagit avec {event.source.name} avec des données: {event.data}")
@@ -40,11 +42,15 @@ class Entity:
         print(f"{self.name} a été attaqué et a perdu {event.data['damage']} points de vie.")
         if self.health <= 0:
             self.die()
+    
+    def handle_death(self, event):
+        print(f"{self.name} est mort.")
 
     def register_for_events(self):
         self.event_manager.register_listener("interaction", self.on_event)
         self.event_manager.register_listener("collision", self.on_event)
         self.event_manager.register_listener("attack", self.on_event)
+        self.event_manager.register_listener("death", self.on_event)
     
     def apply_gravity(self, delta_time):
         """Applique la gravité si l'entité n'est pas au sol."""
@@ -193,7 +199,7 @@ class Animal(Entity):
         # Logique pour enlever l'animal du monde
         print(f"{self.name} est mort.")
         # Supprimer l'animal du monde
-        self.world.remove_entity(self)
+        # self.world.remove_entity(self)
     
     def react_to_pnj(self, pnj):
         """Réaction de l'animal en fonction de la proximité avec un PNJ."""
