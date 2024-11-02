@@ -50,10 +50,27 @@ class World:
         # self.load_chunks_from_file()
     
     def save_chunks_to_file(self):
-        """Enregistre tous les chunks dans un fichier."""
-        chunks_data = {f"{chunk.x}_{chunk.y}": chunk.to_dict() for chunk in self.loaded_chunks.values()}
-        with open(self.chunk_file, 'w') as f:
-            json.dump(chunks_data, f)
+        """Enregistre seulement les chunks modifiés dans un fichier."""
+        if os.path.exists(self.chunk_file):
+            with open(self.chunk_file, 'r') as f:
+                try:
+                    existing_chunks_data = json.load(f)
+                except json.JSONDecodeError:
+                    existing_chunks_data = {}
+        else:
+            existing_chunks_data = {}
+
+        new_chunks_data = {}
+        for chunk_coords, chunk in self.loaded_chunks.items():
+            chunk_key = f"{chunk_coords[0]}_{chunk_coords[1]}"
+            chunk_data = chunk.to_dict()
+            if chunk_key not in existing_chunks_data or existing_chunks_data[chunk_key] != chunk_data:
+                new_chunks_data[chunk_key] = chunk_data
+
+        if new_chunks_data:
+            existing_chunks_data.update(new_chunks_data)
+            with open(self.chunk_file, 'w') as f:
+                json.dump(existing_chunks_data, f)
 
     def load_chunks_from_file(self):
         """Charge tous les chunks à partir d'un fichier."""
