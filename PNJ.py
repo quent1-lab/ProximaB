@@ -8,6 +8,7 @@ class PNJ(Entity):
     def __init__(self, x, y, world, size=1.75, speed=1.0):
         super().__init__(x, y, world, size, entity_type="PNJ")
         self.name = self.init_name()
+        self.vision_range = 5
         self.speed = speed
         self.target = None
         self.pathfinder = Pathfinding(world)
@@ -47,9 +48,8 @@ class PNJ(Entity):
 
     def perform_task_based_on_need(self, need_type, search_method, move_method, action_method, threshold, regeneration_rate):
         """Généralise la gestion des tâches en fonction des besoins avec gestion d'attente."""
-        
         # Vérification de la satisfaction du besoin
-        if self.needs[need_type] < threshold and need_type not in self.finding and not getattr(self, f'target_{need_type}'):
+        if self.needs[need_type] < threshold and need_type not in self.finding and not self.target_hunger and not self.target_thirst:
             # Démarre la recherche de ressource dans un thread à part
             def search_and_set_target():
                 search_method()
@@ -116,7 +116,6 @@ class PNJ(Entity):
         if self.needs['thirst'] >= 100:
             self.target_thirst = None
             self.task_manager.current_task.complete()
-            setattr(self, f'target_{self.corresponding_actions["Water"]}', None)
 
     def consume_food(self,delta_time, regeneration_rate):
         """Mange pour récupérer de la faim."""
@@ -158,6 +157,10 @@ class PNJ(Entity):
             if adjacent_tile:
                 self.set_target(*adjacent_tile)
                 setattr(self, f'target_{self.corresponding_actions[resource_type]}', adjacent_tile)
+            else:
+                print(f"{self} n'a pas trouvé de case adjacente accessible à la ressource {resource_type}.")
+        else:
+            print(f"{self} n'a pas trouvé de ressource {resource_type} à proximité.")
 
     def search_animal(self, resource_type):
         """Cherche l'animal le plus proche et le cible."""
@@ -197,7 +200,7 @@ class PNJ(Entity):
         """Définit un chemin pour le PNJ."""
         self.path = path
 
-    def move(self, delta_time):
+    def move1(self, delta_time):
         """Déplace le PNJ vers la cible."""
         if self.path:
             next_pos = self.path[0]
@@ -207,6 +210,25 @@ class PNJ(Entity):
                 self.vx = (dx / distance) * self.speed
                 self.vy = (dy / distance) * self.speed
                 super().move(delta_time)
+    
+    def choose_next_move(self):
+        """Choisit la prochaine tuile vers laquelle se déplacer en fonction de l'environnement."""
+        adjacent_tiles = self.get_adjacent_tiles()
+        # Exemple de logique simple : se déplacer vers une tuile sans obstacle
+        for tile in adjacent_tiles:
+            if tile.biome not in ['Mountains', 'Water']:  # Exemple de biomes à éviter
+                return tile.x, tile.y
+        return self.x, self.y  # Rester sur place si aucune tuile valide n'est trouvée
+
+    def move(self, delta_time):
+        """Déplace le PNJ vers la cible choisie en temps réel."""
+        next_x, next_y = self.choose_next_move()
+        dx, dy = next_x - self.x, next_y - self.y
+        distance = math.sqrt(dx ** 2 + dy ** 2)
+        if distance > 0:
+            self.vx = (dx / distance) * self.speed
+            self.vy = (dy / distance) * self.speed
+            super().move(delta_time)
     
     def check_adjacent_tiles_for_resource(self, resource_type):
         """Vérifie si une ressource est présente dans les cases adjacentes au PNJ."""
@@ -258,6 +280,22 @@ class PNJ(Entity):
     def get_distance_from(self, x, y):
         """Calcule la distance entre le PNJ et une position donnée."""
         return math.sqrt((self.x - x) ** 2 + (self.y - y) ** 2)
+    
+    def get_adjacent_tiles(self):
+        """Retourne les tuiles adjacentes au PNJ."""
+        adjacent_tiles = []
+        directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]  # Gauche, Droite, Haut, Bas
+        for dx, dy in directions:
+            tile_x = self.x + dx
+            tile_y = self.y + dy
+            chunk_x = int(tile_x // self.config['chunk_size'])
+            chunk_y = int(tile_y // self.config['chunk_size'])
+            chunk = self.world.get_chunk(chunk_x, chunk_y)
+            local_x = int(tile_x % self.config['chunk_size'])
+            local_y = int(tile_y % self.config['chunk_size'])
+            if 0 <= local_x < self.config['chunk_size'] and 0 <= local_y < self.config['chunk_size']:
+                adjacent_tiles.append(chunk.tiles[local_x][local_y])
+        return adjacent_tiles
     
     def is_arrived(self,target, tol = 0.1):
         """Vérifie si le PNJ est arrivé à destination."""

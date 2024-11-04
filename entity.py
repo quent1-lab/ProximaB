@@ -349,7 +349,7 @@ class Pathfinding:
             return 1  # Terrain facile
         return 2  # Coût par défaut
 
-    def a_star(self, start, goal, max_iterations=1000, *args):
+    def a_star(self, start, goal, max_iterations=2500, *args):
         """Implémente l'algorithme A* pour trouver le chemin optimal entre start et goal."""
         open_set = []
         heapq.heappush(open_set, (0, start))  # (F, (x, y))
@@ -380,6 +380,9 @@ class Pathfinding:
                     g_score[neighbor] = tentative_g_score
                     f_score[neighbor] = tentative_g_score + self.heuristic(neighbor, goal)
                     heapq.heappush(open_set, (f_score[neighbor], neighbor))
+        
+        if iterations >= max_iterations:
+            print("Limite d'itérations atteinte. A* n'a pas pu trouver de chemin.")
         
         if path_found:
             return path
