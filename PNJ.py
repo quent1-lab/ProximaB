@@ -200,7 +200,7 @@ class PNJ(Entity):
         """Définit un chemin pour le PNJ."""
         self.path = path
 
-    def move1(self, delta_time):
+    def move(self, delta_time):
         """Déplace le PNJ vers la cible."""
         if self.path:
             next_pos = self.path[0]
@@ -220,7 +220,7 @@ class PNJ(Entity):
                 return tile.x, tile.y
         return self.x, self.y  # Rester sur place si aucune tuile valide n'est trouvée
 
-    def move(self, delta_time):
+    def move2(self, delta_time):
         """Déplace le PNJ vers la cible choisie en temps réel."""
         next_x, next_y = self.choose_next_move()
         dx, dy = next_x - self.x, next_y - self.y
