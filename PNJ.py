@@ -1,4 +1,5 @@
 from entity import Entity, Pathfinding
+from shapely.geometry import Polygon, MultiPoint
 import random, math
 
 class PNJ(Entity):
@@ -36,13 +37,12 @@ class PNJ(Entity):
         self.needs['energy'] -= delta_time * 0.05
 
     def explore_and_memorize_resources(self):
-        """Explore la zone autour et mémorise les ressources découvertes."""
-        visible_resources = self.world.get_tiles_in_range(self.x, self.y, self.vision_range)
-        for resource_type, locations in visible_resources.items():
-            for location in locations:
-                self.memory.memorize_tile(location[0], location[1])
-                if not self.memory.has_position_in_resource(location[0], location[1]):
-                    self.memory.memorize(resource_type, location)
+        """Explore l'environnement et mémorise les ressources visibles."""
+        visible_chunk = self.world.get_chunks_around(self.x, self.y, 1)
+        for chunk in visible_chunk:
+            chunk_x = chunk.x_offset
+            chunk_y = chunk.y_offset
+            self.memory.memorize_chunk(chunk_x, chunk_y, self.config['chunk_size'])
 
     def move_to(self, target):
         """Déplace le PNJ vers une cible spécifique en fonction de son environnement."""
@@ -83,12 +83,14 @@ class PNJ(Entity):
         return False
     
     def get_random_target(self):
-        """Génère une position cible aléatoire dans le monde, privilégiant les tuiles non connues."""
-        max_attempts = 100  # Nombre maximum de tentatives pour trouver une tuile non connue
+        """Génère une position cible aléatoire dans le monde, privilégiant les chunks non connus."""
+        max_attempts = 100  # Nombre maximum de tentatives pour trouver un chunk non connu
         for _ in range(max_attempts):
             target_x = random.randint(int(self.x - self.vision_range), int(self.x + self.vision_range))
             target_y = random.randint(int(self.y - self.vision_range), int(self.y + self.vision_range))
-            if not self.memory.is_tile_known(target_x, target_y):
+            chunk_x = target_x // self.config['chunk_size']
+            chunk_y = target_y // self.config['chunk_size']
+            if not self.memory.is_chunk_known(chunk_x, chunk_y):
                 return (target_x, target_y)
         # Si toutes les tentatives échouent, retourner une position aléatoire
         return (self.x + random.randint(-100, 100), self.y + random.randint(-100, 100))
@@ -189,42 +191,33 @@ class ExploreTask(Task):
             self.pnj.move_to(self.pnj.target_location)
 
 class PNJMemory:
-    """Mémoire des PNJ pour stocker les emplacements des ressources."""
+    """Mémoire des PNJ pour stocker les emplacements des ressources et des chunks découverts."""
     def __init__(self):
         self.resources = {}
-        self.min_x = float('inf')
-        self.max_x = float('-inf')
-        self.min_y = float('inf')
-        self.max_y = float('-inf')
+        self.discovered_chunks = set()  # Ensemble des chunks découverts
+        self.chunk_size = None  # Taille des chunks, à définir lors de la première mémorisation
 
-    def memorize_tile(self, x, y):
-        """Met à jour les limites de la zone connue."""
-        self.min_x = min(self.min_x, x)
-        self.max_x = max(self.max_x, x)
-        self.min_y = min(self.min_y, y)
-        self.max_y = max(self.max_y, y)
+    def memorize_chunk(self, chunk_x, chunk_y, chunk_size):
+        """Mémorise un chunk découvert et met à jour les limites de la zone connue."""
+        self.discovered_chunks.add((chunk_x, chunk_y))
+        if self.chunk_size is None:
+            self.chunk_size = chunk_size
 
-    def is_tile_known(self, x, y):
-        """Vérifie si une tuile est dans la zone connue."""
-        return self.min_x <= x <= self.max_x and self.min_y <= y <= self.max_y
+    def is_chunk_known(self, chunk_x, chunk_y):
+        """Vérifie si un chunk est dans la zone connue."""
+        return (chunk_x, chunk_y) in self.discovered_chunks
 
-    def memorize(self, resource_type, location):
-        """Ajoute l'emplacement d'une ressource en mémoire."""
-        if resource_type not in self.resources:
-            self.resources[resource_type] = []
-        self.resources[resource_type].append(location)
+    def get_discovered_area(self):
+        """Retourne les limites précises de la zone découverte sous forme de polygone."""
+        if not self.discovered_chunks or self.chunk_size is None:
+            return None
 
-    def has_resource(self, resource_type):
-        """Vérifie si le PNJ se souvient de l'emplacement d'une ressource."""
-        return True if resource_type in self.resources else False
-    
-    def has_position_in_resource(self, x, y):
-        """Vérifie si une position est associée à une ressource."""
-        for resource in self.resources.values():
-            if resource == (x, y):
-                return True
-        return False
+        points = []
+        for chunk_x, chunk_y in self.discovered_chunks:
+            x1, y1 = chunk_x, chunk_y
+            x2, y2 = x1 + self.chunk_size, y1 + self.chunk_size
+            points.extend([(x1, y1), (x1, y2), (x2, y1), (x2, y2)])
 
-    def get_resource(self, resource_type):
-        """Récupère l'emplacement mémorisé d'une ressource."""
-        return self.resources.get(resource_type)
+        # Utiliser shapely pour créer un polygone à partir des points
+        polygon = MultiPoint(points).convex_hull
+        return polygon

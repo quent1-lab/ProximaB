@@ -1,6 +1,6 @@
 import json, pygame, uuid, perlin_noise, os, json, numpy as np
 from chunk_ import Chunk
-import concurrent.futures
+from shapely.geometry import MultiPoint
 
 # Charger la configuration depuis un fichier JSON
 def load_config(file_path):
@@ -206,20 +206,29 @@ class World:
     
     def get_tiles_in_range(self, x, y, radius):
         """Retourne les tuiles dans un rayon donné autour des coordonnées (x, y)."""
-        resources = {}
+        resources = []
         radius_chunk = radius // self.config['chunk_size'] + 1
-        for chunk in self.get_chunks_around(x, y, radius_chunk):
+        chunks_around = self.get_chunks_around(x, y, radius_chunk)
+        
+        # print(f"Chunks around ({x}, {y}) with radius {radius}: {len(chunks_around)} chunks")
+
+        for chunk in chunks_around:
+            chunk_x_offset = chunk.x_offset
+            chunk_y_offset = chunk.y_offset
+            # print(f"Processing chunk at offset ({chunk_x_offset}, {chunk_y_offset})")
+
             for row in chunk.tiles:
                 for tile in row:
-                    x_world = tile.x + chunk.x_offset
-                    y_world = tile.y + chunk.y_offset
+                    x_world = tile.x + chunk_x_offset
+                    y_world = tile.y + chunk_y_offset
+
                     distance = np.sqrt((x_world - x) ** 2 + (y_world - y) ** 2)
                     if distance <= radius:
                         if tile.biome not in resources:
                             resources[tile.biome] = [(x_world, y_world)]
                         else:
-                            # Ajouter la tuile la plus proche à la liste
                             resources[tile.biome].append((x_world, y_world))
+        print(f"Resources in range: {resources}")
         return resources
 
     def pick_up_item_in_world(self, entity, item_name, quantity=1):
@@ -428,12 +437,20 @@ class Camera:
                 # Afficher la zone découverte par le PNJ
                 if entity.entity_type == "PNJ":
                     if entity.memory:
-                        if entity.memory.min_x != float('inf'):
-                            min_x_screen = int((entity.memory.min_x - self.camera_center_x + self.screen_width / 2 / self.scale) * self.scale)
-                            min_y_screen = int((entity.memory.min_y - self.camera_center_y + self.screen_height / 2 / self.scale) * self.scale)
-                            max_x_screen = int((entity.memory.max_x - self.camera_center_x + self.screen_width / 2 / self.scale) * self.scale)
-                            max_y_screen = int((entity.memory.max_y - self.camera_center_y + self.screen_height / 2 / self.scale) * self.scale)
-                            pygame.draw.rect(self.screen, (0, 255, 255, 100), (min_x_screen, min_y_screen, max_x_screen - min_x_screen, max_y_screen - min_y_screen), 1)
+                        polygon = entity.memory.get_discovered_area()
+                        if polygon:
+                            # Obtenir les points du polygone
+                            points = list(polygon.exterior.coords)
+                            # Convertir les points en coordonnées d'écran
+                            screen_points = [
+                                (
+                                    int((x - self.camera_center_x + self.screen_width / 2 / self.scale) * self.scale),
+                                    int((y - self.camera_center_y + self.screen_height / 2 / self.scale) * self.scale)
+                                )
+                                for x, y in points
+                            ]
+                            # Dessiner le polygone
+                            pygame.draw.polygon(self.screen, (0, 255, 255, 100), screen_points, 1)
                 
         # Ecriture du nombre de chunks chargés
         text = self.font.render(f"Chunks loaded: {len(self.world.loaded_chunks)}", True, (255, 255, 255))
