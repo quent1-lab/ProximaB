@@ -46,8 +46,8 @@ def handle_entity_hover_and_click(world, camera):
 
 def display_entity_info(entity, camera):
     """Affiche les informations d'une entité survolée."""
-    name = entity.__class__.__name__
-    info = f"{name} at ({entity.x:.2f}, {entity.y:.2f})"
+    name = entity.name
+    info = f"PNJ {name} - ({entity.x:.2f}, {entity.y:.2f})"
     
     # Récupérer dynamiquement tous les attributs potentiels comme énergie, faim, soif, etc.
     for need, value in entity.needs.items():

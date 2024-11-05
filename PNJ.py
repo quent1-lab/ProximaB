@@ -37,11 +37,12 @@ class PNJ(Entity):
 
     def explore_and_memorize_resources(self):
         """Explore la zone autour et mémorise les ressources découvertes."""
-        visible_resources = self.world.get_resources_in_range(self.x, self.y, self.vision_range)
-        for resource_type, location in visible_resources.items():
-            self.memory.memorize_tile(location[0], location[1])
-            if not self.memory.has_resource(resource_type):
-                self.memory.memorize(resource_type, location)
+        visible_resources = self.world.get_tiles_in_range(self.x, self.y, self.vision_range)
+        for resource_type, locations in visible_resources.items():
+            for location in locations:
+                self.memory.memorize_tile(location[0], location[1])
+                if not self.memory.has_position_in_resource(location[0], location[1]):
+                    self.memory.memorize(resource_type, location)
 
     def move_to(self, target):
         """Déplace le PNJ vers une cible spécifique en fonction de son environnement."""
@@ -90,7 +91,7 @@ class PNJ(Entity):
             if not self.memory.is_tile_known(target_x, target_y):
                 return (target_x, target_y)
         # Si toutes les tentatives échouent, retourner une position aléatoire
-        return (random.randint(0, self.world.width - 1), random.randint(0, self.world.height - 1))
+        return (self.x + random.randint(-100, 100), self.y + random.randint(-100, 100))
 
     def is_at_target(self):
         """Vérifie si le PNJ est à la position cible."""
@@ -128,10 +129,10 @@ class BehaviorManager:
 
     def decide_next_task(self):
         """Décide de la prochaine tâche en fonction des besoins et de la mémoire."""
-        if self.pnj.needs['thirst'] < 30 and self.pnj.memory.has_resource('Water'):
-            print(f"{self.pnj.name} a soif !")
+        if self.pnj.needs['thirst'] < 90 and self.pnj.memory.has_resource('Water'):
+            print(f"{self.pnj.name} a soif ! - {self.pnj.memory.get_resource('Water')}")
             return DrinkTask(self.pnj)
-        elif self.pnj.needs['hunger'] < 50 and self.pnj.memory.has_resource('Food'):
+        elif self.pnj.needs['hunger'] < 70 and self.pnj.memory.has_resource('Food'):
             print(f"{self.pnj.name} a faim !")
             return EatTask(self.pnj)
         else:
@@ -153,7 +154,16 @@ class DrinkTask(Task):
         if not self.pnj.memory.has_resource('Water'):
             self.pnj.find_water()
         else:
-            self.pnj.move_to(self.pnj.memory.get_resource('Water'))
+            # Trouve la ressource en eau la plus proche
+            target = None
+            min_distance = float('inf')
+            for resource in self.pnj.memory.resources["Water"]:
+                distance = math.sqrt((self.pnj.x - resource[0]) ** 2 + (self.pnj.y - resource[1]) ** 2)
+                if distance < min_distance:
+                    min_distance = distance
+                    target = resource
+            print(f"{self.pnj.name} se dirige vers la ressource en eau la plus proche : {target}")
+            self.pnj.move_to(target)
             if self.pnj.is_at_target():
                 self.pnj.consume_water(delta_time)
                 self.complete = True
@@ -170,7 +180,10 @@ class EatTask(Task):
 
 class ExploreTask(Task):
     def execute(self, delta_time):
-        if self.pnj.is_at_target() or not self.pnj.target_location:
+        if self.pnj.is_at_target():
+            self.complete = True
+            self.pnj.target_location = None
+        elif not self.pnj.target_location:
             self.pnj.target_location = self.pnj.get_random_target()
         else:
             self.pnj.move_to(self.pnj.target_location)
@@ -197,11 +210,20 @@ class PNJMemory:
 
     def memorize(self, resource_type, location):
         """Ajoute l'emplacement d'une ressource en mémoire."""
-        self.resources[resource_type] = location
+        if resource_type not in self.resources:
+            self.resources[resource_type] = []
+        self.resources[resource_type].append(location)
 
     def has_resource(self, resource_type):
         """Vérifie si le PNJ se souvient de l'emplacement d'une ressource."""
-        return resource_type in self.resources
+        return True if resource_type in self.resources else False
+    
+    def has_position_in_resource(self, x, y):
+        """Vérifie si une position est associée à une ressource."""
+        for resource in self.resources.values():
+            if resource == (x, y):
+                return True
+        return False
 
     def get_resource(self, resource_type):
         """Récupère l'emplacement mémorisé d'une ressource."""

@@ -190,16 +190,36 @@ class World:
         local_y = int(y) % self.config['chunk_size']
         return chunk.tiles[local_x][local_y]
     
-    def get_resources_in_range(self, x, y, radius):
-        """Retourne les ressources spécifiques dans un rayon autour de (x, y)."""
+    # def get_resources_in_range(self, x, y, radius):
+    #     """Retourne les ressources spécifiques dans un rayon autour de (x, y)."""
+    #     resources = {}
+    #     radius_chunk = radius // self.config['chunk_size'] + 1
+    #     for chunk in self.get_chunks_around(x, y, radius_chunk):
+    #         for row in chunk.tiles:
+    #             for tile in row:
+    #                 if tile.distance_to(x, y) <= radius:
+    #                     if tile.biome:  # Assurez-vous que la tuile a une ressource
+    #                         x_world = tile.x + chunk.x_offset
+    #                         y_world = tile.y + chunk.y_offset
+    #                         resources[tile.biome] = (x_world, y_world)
+    #     return resources
+    
+    def get_tiles_in_range(self, x, y, radius):
+        """Retourne les tuiles dans un rayon donné autour des coordonnées (x, y)."""
         resources = {}
         radius_chunk = radius // self.config['chunk_size'] + 1
         for chunk in self.get_chunks_around(x, y, radius_chunk):
             for row in chunk.tiles:
                 for tile in row:
-                    if tile.distance_to(x, y) <= radius:
-                        if tile.biome:  # Assurez-vous que la tuile a une ressource
-                            resources[tile.biome] = (tile.x, tile.y)
+                    x_world = tile.x + chunk.x_offset
+                    y_world = tile.y + chunk.y_offset
+                    distance = np.sqrt((x_world - x) ** 2 + (y_world - y) ** 2)
+                    if distance <= radius:
+                        if tile.biome not in resources:
+                            resources[tile.biome] = [(x_world, y_world)]
+                        else:
+                            # Ajouter la tuile la plus proche à la liste
+                            resources[tile.biome].append((x_world, y_world))
         return resources
 
     def pick_up_item_in_world(self, entity, item_name, quantity=1):
