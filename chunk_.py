@@ -37,6 +37,10 @@ class Tile:
         with self.chunk_lock:  # Protéger l'accès aux données des chunks
             self.grass_quantity = max(0, self.grass_quantity + amount)
     
+    def distance_to(self, x, y):
+        """Calcule la distance entre la tuile et les coordonnées spécifiées."""
+        return abs(self.x - x) + abs(self.y - y)
+    
     def to_dict(self):
         """Convertit la tuile en un dictionnaire sérialisable."""
         return {

@@ -55,6 +55,7 @@ class World:
         for i in range(-radius, radius + 1):
             for j in range(-radius, radius + 1):
                 self.get_chunk(i, j)
+        self.save_chunks_to_file()
     
     def save_chunks_to_file(self):
         """Enregistre seulement les chunks modifiés dans un fichier."""
@@ -93,6 +94,10 @@ class World:
                         self.loaded_chunks[(chunk_x, chunk_y)] = Chunk.from_dict(data, self.noise_generator, self.config, self.chunk_lock, self.entity_lock)
             except json.JSONDecodeError as e:
                 print(f"Erreur de décodage JSON pour le fichier {self.chunk_file} : {e}")
+                # Supprimer le fichier
+                os.remove(self.chunk_file)
+        else:
+            print(f"Le fichier {self.chunk_file} n'existe pas.")
     
     def add_entity(self, entity):
         """Ajoute une entité au monde."""
@@ -185,13 +190,16 @@ class World:
         local_y = int(y) % self.config['chunk_size']
         return chunk.tiles[local_x][local_y]
     
-    def get_resources_in_range(self, x, y, radius, resource_type):
+    def get_resources_in_range(self, x, y, radius):
         """Retourne les ressources spécifiques dans un rayon autour de (x, y)."""
-        resources = []
-        for chunk in self.get_chunks_around(x, y, radius):
-            for tile in chunk.tiles:
-                if tile.resource_type == resource_type and tile.distance_to(x, y) <= radius:
-                    resources.append(tile)
+        resources = {}
+        radius_chunk = radius // self.config['chunk_size'] + 1
+        for chunk in self.get_chunks_around(x, y, radius_chunk):
+            for row in chunk.tiles:
+                for tile in row:
+                    if tile.distance_to(x, y) <= radius:
+                        if tile.biome:  # Assurez-vous que la tuile a une ressource
+                            resources[tile.biome] = (tile.x, tile.y)
         return resources
 
     def pick_up_item_in_world(self, entity, item_name, quantity=1):
@@ -221,8 +229,9 @@ class World:
     
     def update_entities(self, delta_time):
         """Met à jour toutes les entités du monde."""
-        for entity_list in self.entities.values():
-            self.tiles_with_entities = []  # Liste des tuiles ayant des entités
+        entity_keys = list(self.entities.keys())
+        for entity_type in entity_keys:
+            entity_list = self.entities.get(entity_type, [])
             for entity in entity_list:
                 entity.update(delta_time)
         
@@ -372,14 +381,6 @@ class Camera:
             # Ajouter l'offset du chunk pour le rendu
             for x, y, w, h, tile_type in rectangle:
                 rectangles.append((x + chunk_x * self.chunk_size, y + chunk_y * self.chunk_size, w, h, tile_type))
-                
-        # Récupérer toutes les tuiles des chunks visibles
-        # visible_tiles, width, height = self.get_visible_tiles()
-        # self.render_visible_tiles(visible_tiles)
-
-        # Appliquer le greedy meshing sur les tuiles visibles
-        # rectangles = self.greedy_mesh(visible_tiles)
-        # rectangles = self.greedy_mesh_optimized(visible_tiles)
 
         # Rendre les rectangles optimisés
         self.render_rectangles(rectangles)
@@ -399,21 +400,21 @@ class Camera:
                 screen_x = int((entity.x - self.camera_center_x + self.screen_width / 2 / self.scale) * self.scale)
                 screen_y = int((entity.y - self.camera_center_y + self.screen_height / 2 / self.scale) * self.scale)
                 entity.render(self.screen, self.scale, screen_x, screen_y)
+                
+                # Afficher la zone visible par le PNJ
+                if entity.vision_range > 0:
+                    pygame.draw.circle(self.screen, (255, 255, 255, 100), (screen_x, screen_y), int(entity.vision_range * self.scale), 1)
 
-        # Dessiner le chemin du PNJ
-        for pnj in self.world.entities['PNJ']:
-            for i in range(len(pnj.path)):
-                if i == 0:
-                    start_x, start_y = pnj.x, pnj.y
-                else:
-                    start_x, start_y = pnj.path[i - 1]
-                end_x, end_y = pnj.path[i]
-                pygame.draw.line(self.screen, (255, 0, 0),
-                                ((start_x - self.camera_center_x + self.screen_width / 2 / self.scale) * self.scale,
-                                (start_y - self.camera_center_y + self.screen_height / 2 / self.scale) * self.scale),
-                                ((end_x - self.camera_center_x + self.screen_width / 2 / self.scale) * self.scale,
-                                (end_y - self.camera_center_y + self.screen_height / 2 / self.scale) * self.scale))
-
+                # Afficher la zone découverte par le PNJ
+                if entity.entity_type == "PNJ":
+                    if entity.memory:
+                        if entity.memory.min_x != float('inf'):
+                            min_x_screen = int((entity.memory.min_x - self.camera_center_x + self.screen_width / 2 / self.scale) * self.scale)
+                            min_y_screen = int((entity.memory.min_y - self.camera_center_y + self.screen_height / 2 / self.scale) * self.scale)
+                            max_x_screen = int((entity.memory.max_x - self.camera_center_x + self.screen_width / 2 / self.scale) * self.scale)
+                            max_y_screen = int((entity.memory.max_y - self.camera_center_y + self.screen_height / 2 / self.scale) * self.scale)
+                            pygame.draw.rect(self.screen, (0, 255, 255, 100), (min_x_screen, min_y_screen, max_x_screen - min_x_screen, max_y_screen - min_y_screen), 1)
+                
         # Ecriture du nombre de chunks chargés
         text = self.font.render(f"Chunks loaded: {len(self.world.loaded_chunks)}", True, (255, 255, 255))
         self.screen.blit(text, (10, 40))

@@ -19,6 +19,7 @@ class Entity:
         self.in_water = False  # Indique si l'entité est dans l'eau
         
         self.health = 100  # Points de vie de l'entité
+        self.vision_range = 10  # Portée de vision de l'entité
         
         self.event_manager = world.event_manager
         
@@ -163,7 +164,7 @@ class Entity:
         return self.vx != 0 or self.vy != 0
     
     def __str__(self) -> str:
-        return f"{self.entity_type} at ({self.x:.1f}, {self.y:.1f})"
+        return f"({self.x:.1f}, {self.y:.1f})"
 
     def __repr__(self):
         return f"{self.name}: Storage - {self.storage_inventory}, Resources - {self.resource_inventory}, Holding - {self.holding_item}"
@@ -437,3 +438,7 @@ class Pathfinding:
             simplified_path[-1] = (last_node[0] + 0.5, last_node[1] + 0.5)
 
         return simplified_path
+
+    def is_target_reached(self, x, y, target, threshold=0.05):
+        """Vérifie si la cible a été atteinte plus ou moins à une certaine distance."""
+        return math.sqrt((target[0] - x) ** 2 + (target[1] - y) ** 2) < threshold
