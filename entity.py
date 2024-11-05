@@ -333,7 +333,7 @@ class Pathfinding:
         x, y = node
         neighbors = [(x+1, y), (x-1, y), (x, y+1), (x, y-1)]  # 4 directions de déplacement
         # Filtrer les voisins hors du monde
-        return [n for n in neighbors if self.world.is_within_bounds(n[0], n[1])]
+        return [n for n in neighbors if True]
 
     def get_cost(self, node):
         """Retourne le coût de déplacement pour une case donnée (en fonction du type de terrain)."""
@@ -408,7 +408,7 @@ class Pathfinding:
         err = dx - dy
 
         while (x1, y1) != (x2, y2):
-            if not self.world.is_within_bounds(x1, y1) or self.get_cost((x1, y1)) == float('inf'):
+            if self.get_cost((x1, y1)) == float('inf'):
                 return False
             e2 = err * 2
             if e2 > -dy:

@@ -49,6 +49,13 @@ class World:
         self.init_loaded_chunks(config['initial_chunk_radius'])
         # self.load_chunks_from_file()
     
+    def init_loaded_chunks(self, radius):
+        """Charge un nombre initial de chunks dans le monde."""
+        self.load_chunks_from_file()
+        for i in range(-radius, radius + 1):
+            for j in range(-radius, radius + 1):
+                self.get_chunk(i, j)
+    
     def save_chunks_to_file(self):
         """Enregistre seulement les chunks modifiés dans un fichier."""
         if os.path.exists(self.chunk_file):
@@ -87,61 +94,6 @@ class World:
             except json.JSONDecodeError as e:
                 print(f"Erreur de décodage JSON pour le fichier {self.chunk_file} : {e}")
     
-    def init_loaded_chunks(self, radius):
-        """Charge un nombre initial de chunks dans le monde."""
-        self.load_chunks_from_file()
-        for i in range(-radius, radius + 1):
-            for j in range(-radius, radius + 1):
-                self.get_chunk(i, j)
-        
-    def unload_chunks_outside_view(self, left_bound, right_bound, top_bound, bottom_bound):
-        """Décharge les chunks qui sont hors de la zone visible de la caméra après un délai."""
-        chunk_size = self.config['chunk_size']
-        
-        # Déterminer les coordonnées des chunks dans les limites visibles
-        left_chunk = int(left_bound) // chunk_size
-        right_chunk = int(right_bound) // chunk_size
-        top_chunk = int(top_bound) // chunk_size
-        bottom_chunk = int(bottom_bound) // chunk_size
-        
-        # Créer un set pour les nouveaux chunks visibles
-        new_visible_chunks = set()
-        for chunk_x in range(left_chunk, right_chunk + 1):
-            for chunk_y in range(top_chunk, bottom_chunk + 1):
-                new_visible_chunks.add((chunk_x, chunk_y))
-        
-        # Marquer les chunks récemment visibles et décharger ceux dont le compteur atteint 0
-        chunks_to_unload = []
-        for chunk_coords in self.recent_chunks.copy():
-            if chunk_coords not in new_visible_chunks:
-                self.recent_chunks[chunk_coords] -= 1  # Décrémenter le compteur
-                if self.recent_chunks[chunk_coords] <= 0:
-                    chunks_to_unload.append(chunk_coords)  # Le chunk sera déchargé
-            else:
-                del self.recent_chunks[chunk_coords]  # Retirer du cache si visible à nouveau
-        
-        # Ajouter les nouveaux chunks visibles au cache
-        self.visible_chunks = new_visible_chunks
-        for chunk_coords in self.visible_chunks:
-            if chunk_coords in self.loaded_chunks and chunk_coords not in self.recent_chunks:
-                self.recent_chunks[chunk_coords] = self.chunk_cache_duration
-        
-        # Décharger les chunks qui sont restés hors de la vue trop longtemps
-        for chunk_coords in chunks_to_unload:
-            if chunk_coords in self.loaded_chunks:
-                del self.loaded_chunks[chunk_coords]  # Décharger le chunk
-    
-    def get_tile_at(self, x, y):
-        """Retourne le type de terrain pour les coordonnées globales (x, y)."""
-        chunk_x = int(x) // self.config['chunk_size']
-        chunk_y = int(y) // self.config['chunk_size']
-        chunk = self.get_chunk(chunk_x, chunk_y)
-        
-        # Calculer les coordonnées locales dans le chunk
-        local_x = int(x) % self.config['chunk_size']
-        local_y = int(y) % self.config['chunk_size']
-        return chunk.tiles[local_x][local_y]
-    
     def add_entity(self, entity):
         """Ajoute une entité au monde."""
         entity.register_for_events()
@@ -155,50 +107,38 @@ class World:
         chunk_y = int(entity.y) // self.config['chunk_size']
         chunk = self.get_chunk(chunk_x, chunk_y)
         chunk.add_entity(entity.entity_type)
-    
-    def remove_entity(self, entity):
-        """Supprime une entité du monde."""
-        for key, entity_list in self.entities.items():
-            if entity in entity_list:
-                self.entities[key].remove(entity)
+
+    def add_entity_to_tile(self, tile):
+        """Ajoute une entité à une tuile et l'enregistre dans la liste."""
+        tile.set_entity_presence(True)
+        if tile not in self.tiles_with_entities:
+            self.tiles_with_entities.append(tile)
+
+    def entity_is_present(self):
+        """Vérifie si une entité est présente sur une tuile, et met à jour la tuile en conséquence."""
+        for entity_list in self.entities.values():
+            for entity in entity_list:
+                tile = self.get_tile_at(entity.x, entity.y)
+                self.add_entity_to_tile(tile)
+
+    def entity_is_not_present(self):
+        """Met à jour la présence d'une entité sur les tuiles spécifiques où une entité était présente."""
+        # Parcourir seulement les tuiles ayant des entités
+        for tile in self.tiles_with_entities[:]:  # [:] pour éviter la modification de la liste pendant l'itération
+            if tile.has_entity:
+                # Mettre à jour la présence de l'entité
+                tile.set_entity_presence(False)
+                # Retirer la tuile de la liste une fois l'entité disparue
+                self.tiles_with_entities.remove(tile)
+
+    def drop_item_in_world(self, entity, item_name, quantity=1):
+        chunk = self.get_chunk((entity.x, entity.y))
+        entity.drop_item(item_name, chunk, quantity)
     
     def generate_id(self):
         """Génère un ID unique pour une entité."""
         return str(uuid.uuid1())
     
-    def update_entities(self, delta_time):
-        """Met à jour toutes les entités du monde."""
-        for entity_list in self.entities.values():
-            self.tiles_with_entities = []  # Liste des tuiles ayant des entités
-            for entity in entity_list:
-                entity.update(delta_time)
-        
-        # Vérifier la présence des entités sur les tuiles
-        #self.entity_is_present()
-        
-        # Vérifier la présence des entités sur les tuiles
-        #self.entity_is_not_present()
-   
-    def search_for_entities(self, x, y, radius, entity_type):
-        """Recherche des entités dans un rayon donné autour des coordonnées (x, y)."""
-        entities_in_radius = []
-        for entity in self.entities[entity_type]:
-            distance = np.sqrt((entity.x - x) ** 2 + (entity.y - y) ** 2)
-            if distance <= radius:
-                entities_in_radius.append(entity)
-        return entities_in_radius
-    
-    def get_closest_entity(self, x, y, entity_type):
-        """Retourne l'entité la plus proche des coordonnées (x, y)."""
-        closest_entity = None
-        closest_distance = np.inf
-        for entity in self.entities[entity_type]:
-            distance = np.sqrt((entity.x - x) ** 2 + (entity.y - y) ** 2)
-            if distance < closest_distance:
-                closest_entity = entity
-                closest_distance = distance
-        return closest_entity
-
     def get_chunk(self, chunk_x, chunk_y):
         """Retourne un chunk, le génère si nécessaire."""
         if (chunk_x, chunk_y) not in self.loaded_chunks:
@@ -223,62 +163,74 @@ class World:
         chunk_y = int(y) // self.config['chunk_size']
         return self.get_chunk(chunk_x, chunk_y)
     
-    def load_chunks_around_camera(self, left_bound, right_bound, top_bound, bottom_bound):
-        """Charge les chunks dans la zone définie par les limites visibles de la caméra."""
-        chunk_size = self.config['chunk_size']
+    def get_closest_entity(self, x, y, entity_type):
+        """Retourne l'entité la plus proche des coordonnées (x, y)."""
+        closest_entity = None
+        closest_distance = np.inf
+        for entity in self.entities[entity_type]:
+            distance = np.sqrt((entity.x - x) ** 2 + (entity.y - y) ** 2)
+            if distance < closest_distance:
+                closest_entity = entity
+                closest_distance = distance
+        return closest_entity
 
-        # Déterminer les coordonnées des chunks à charger
-        left_chunk = int(left_bound) // chunk_size
-        right_chunk = int(right_bound) // chunk_size
-        top_chunk = int(top_bound) // chunk_size
-        bottom_chunk = int(bottom_bound) // chunk_size
-
-        # Charger tous les chunks dans la zone visible
-        for chunk_x in range(left_chunk, right_chunk + 1):
-            for chunk_y in range(top_chunk, bottom_chunk + 1):
-                self.get_chunk(chunk_x, chunk_y)
-    
-    def is_within_bounds(self, x, y):
-        """Vérifie si les coordonnées (x, y) sont dans les limites du monde généré."""
-        # Si le monde est théoriquement infini (généré à la demande), tout est dans les limites
-        return True  # On considère que les coordonnées sont toujours valides
-
-    def entity_is_present(self):
-        """Vérifie si une entité est présente sur une tuile, et met à jour la tuile en conséquence."""
-        for entity_type, entity_list in self.entities.items():
-            for entity in entity_list:
-                tile = self.get_tile_at(entity.x, entity.y)
-                self.add_entity_to_tile(tile)
+    def get_tile_at(self, x, y):
+        """Retourne le type de terrain pour les coordonnées globales (x, y)."""
+        chunk_x = int(x) // self.config['chunk_size']
+        chunk_y = int(y) // self.config['chunk_size']
+        chunk = self.get_chunk(chunk_x, chunk_y)
         
-    def entity_is_not_present(self):
-        """Met à jour la présence d'une entité sur les tuiles spécifiques où une entité était présente."""
-        # Parcourir seulement les tuiles ayant des entités
-        for tile in self.tiles_with_entities[:]:  # [:] pour éviter la modification de la liste pendant l'itération
-            if tile.has_entity:
-                # Mettre à jour la présence de l'entité
-                tile.set_entity_presence(False)
-                # Retirer la tuile de la liste une fois l'entité disparue
-                self.tiles_with_entities.remove(tile)
+        # Calculer les coordonnées locales dans le chunk
+        local_x = int(x) % self.config['chunk_size']
+        local_y = int(y) % self.config['chunk_size']
+        return chunk.tiles[local_x][local_y]
+    
+    def get_resources_in_range(self, x, y, radius, resource_type):
+        """Retourne les ressources spécifiques dans un rayon autour de (x, y)."""
+        resources = []
+        for chunk in self.get_chunks_around(x, y, radius):
+            for tile in chunk.tiles:
+                if tile.resource_type == resource_type and tile.distance_to(x, y) <= radius:
+                    resources.append(tile)
+        return resources
 
-    def add_entity_to_tile(self, tile):
-        """Ajoute une entité à une tuile et l'enregistre dans la liste."""
-        tile.set_entity_presence(True)
-        if tile not in self.tiles_with_entities:
-            self.tiles_with_entities.append(tile)
+    def pick_up_item_in_world(self, entity, item_name, quantity=1):
+        chunk = self.get_chunk((entity.x, entity.y))
+        return entity.pick_up_item(chunk, item_name, quantity)
 
     def remove_entity_from_tile(self, tile):
         """Retire une entité d'une tuile."""
         tile.set_entity_presence(False)
         if tile in self.tiles_with_entities:
             self.tiles_with_entities.remove(tile)
-
-    def drop_item_in_world(self, entity, item_name, quantity=1):
-        chunk = self.get_chunk((entity.x, entity.y))
-        entity.drop_item(item_name, chunk, quantity)
-
-    def pick_up_item_in_world(self, entity, item_name, quantity=1):
-        chunk = self.get_chunk((entity.x, entity.y))
-        return entity.pick_up_item(chunk, item_name, quantity)
+    
+    def remove_entity(self, entity):
+        """Supprime une entité du monde."""
+        for key, entity_list in self.entities.items():
+            if entity in entity_list:
+                self.entities[key].remove(entity)
+   
+    def search_for_entities(self, x, y, radius, entity_type):
+        """Recherche des entités dans un rayon donné autour des coordonnées (x, y)."""
+        entities_in_radius = []
+        for entity in self.entities[entity_type]:
+            distance = np.sqrt((entity.x - x) ** 2 + (entity.y - y) ** 2)
+            if distance <= radius:
+                entities_in_radius.append(entity)
+        return entities_in_radius
+    
+    def update_entities(self, delta_time):
+        """Met à jour toutes les entités du monde."""
+        for entity_list in self.entities.values():
+            self.tiles_with_entities = []  # Liste des tuiles ayant des entités
+            for entity in entity_list:
+                entity.update(delta_time)
+        
+        # Vérifier la présence des entités sur les tuiles
+        self.entity_is_present()
+        
+        # Vérifier la présence des entités sur les tuiles
+        self.entity_is_not_present()
 
 # ======================================================================================
 # ================================= Class CAMERA =======================================
