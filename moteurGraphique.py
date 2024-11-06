@@ -1,6 +1,6 @@
 import json, pygame, uuid, perlin_noise, os, json, numpy as np
 from chunk_ import Chunk
-from shapely.geometry import MultiPoint
+from shapely.geometry import MultiPolygon
 
 # Charger la configuration depuis un fichier JSON
 def load_config(file_path):
@@ -429,18 +429,39 @@ class Camera:
                 screen_x = int((entity.x - self.camera_center_x + self.screen_width / 2 / self.scale) * self.scale)
                 screen_y = int((entity.y - self.camera_center_y + self.screen_height / 2 / self.scale) * self.scale)
                 entity.render(self.screen, self.scale, screen_x, screen_y)
-                
-                # Afficher la zone visible par le PNJ
-                if entity.vision_range > 0:
-                    pygame.draw.circle(self.screen, (255, 255, 255, 100), (screen_x, screen_y), int(entity.vision_range * self.scale), 1)
 
                 # Afficher la zone découverte par le PNJ
                 if entity.entity_type == "PNJ":
                     if entity.memory:
                         polygon = entity.memory.get_discovered_area()
                         if polygon:
+                            # Si c'est un MultiPolygon, itérer sur chaque polygone
+                            if isinstance(polygon, MultiPolygon):
+                                polygons = polygon.geoms
+                            else:
+                                polygons = [polygon]
+
+                            for poly in polygons:
+                                # Obtenir les points du polygone
+                                points = list(poly.exterior.coords)
+                                # Convertir les points en coordonnées d'écran
+                                screen_points = [
+                                    (
+                                        int((x - self.camera_center_x + self.screen_width / 2 / self.scale) * self.scale),
+                                        int((y - self.camera_center_y + self.screen_height / 2 / self.scale) * self.scale)
+                                    )
+                                    for x, y in points
+                                ]
+                                # Dessiner le polygone
+                                pygame.draw.polygon(self.screen, (0, 255, 255, 100), screen_points, 1)
+                
+                        # Afficher la zone visible par le PNJ
+                    if entity.vision_range > 0:
+                        # Affiche le cone de vision en fonction de l'angle de vue
+                        vision_polygon = entity.get_vision_polygon()
+                        if vision_polygon:
                             # Obtenir les points du polygone
-                            points = list(polygon.exterior.coords)
+                            points = list(vision_polygon.exterior.coords)
                             # Convertir les points en coordonnées d'écran
                             screen_points = [
                                 (
@@ -450,7 +471,7 @@ class Camera:
                                 for x, y in points
                             ]
                             # Dessiner le polygone
-                            pygame.draw.polygon(self.screen, (0, 255, 255, 100), screen_points, 1)
+                            pygame.draw.polygon(self.screen, (255, 255, 0, 100), screen_points)
                 
         # Ecriture du nombre de chunks chargés
         text = self.font.render(f"Chunks loaded: {len(self.world.loaded_chunks)}", True, (255, 255, 255))

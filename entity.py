@@ -1,5 +1,6 @@
 import random, pygame, math, heapq
 from item import Inventory, DroppedItem
+from shapely.geometry import Polygon
 
 class Entity:
     """Classe représentant une entité générique dans le monde."""
@@ -22,6 +23,9 @@ class Entity:
         self.vision_range = 10  # Portée de vision de l'entité
         
         self.event_manager = world.event_manager
+        
+        self.view_angle = 90  # Angle de vision en degrés
+        self.direction = (1, 0)  # Direction initiale de la vue vers la droite (vecteur x=1, y=0)
         
         self.storage_inventory = Inventory(storage_capacity)  # Pour les objets stockés
         self.resource_inventory = Inventory(float('inf'))     # Pour les ressources propres de l'entité
@@ -111,6 +115,17 @@ class Entity:
         # Mise à jour de la position
         self.x = new_x
         self.y = new_y
+        
+        # Mise à jour de la direction
+        if self.vx != 0 or self.vy != 0:
+            self.direction = (self.vx, self.vy)
+            self.normalize_direction()
+    
+    def normalize_direction(self):
+        """Normalise le vecteur de direction."""
+        length = math.sqrt(self.direction[0] ** 2 + self.direction[1] ** 2)
+        if length > 0:
+            self.direction = (self.direction[0] / length, self.direction[1] / length)
     
     def collides_with_ground(self, x, y):
         """Vérifie si l'entité entre en collision avec le sol."""
@@ -163,6 +178,17 @@ class Entity:
         """Retourne True si l'entité a bougé, False sinon."""
         return self.vx != 0 or self.vy != 0
     
+    def get_vision_polygon(self):
+        """Retourne un polygone représentant le champ de vision du PNJ."""
+        half_angle = self.view_angle // 2
+        points = []
+        for i in range(-half_angle, half_angle + 1, 5):
+            rad_angle = math.radians(i)
+            dir_x = self.direction[0] * math.cos(rad_angle) - self.direction[1] * math.sin(rad_angle)
+            dir_y = self.direction[0] * math.sin(rad_angle) + self.direction[1] * math.cos(rad_angle)
+            points.append((self.x + dir_x * self.vision_range, self.y + dir_y * self.vision_range))
+        return Polygon(points)
+    
     def __str__(self) -> str:
         return f"({self.x:.1f}, {self.y:.1f})"
 
@@ -178,12 +204,6 @@ class Animal(Entity):
         self.intelligence = 0.5  # Niveau d'intelligence de l'animal (peut influencer ses décisions)
         self.direction = (random.uniform(-1, 1), random.uniform(-1, 1))
         self.normalize_direction()
-
-    def normalize_direction(self):
-        """Normalise le vecteur de direction."""
-        length = math.sqrt(self.direction[0] ** 2 + self.direction[1] ** 2)
-        if length > 0:
-            self.direction = (self.direction[0] / length, self.direction[1] / length)
 
     def wander(self, delta_time):
         """Déplacement aléatoire pour les animaux avec des mouvements plus réalistes."""
