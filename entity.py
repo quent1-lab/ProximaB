@@ -24,7 +24,7 @@ class Entity:
         
         self.event_manager = world.event_manager
         
-        self.view_angle = 90  # Angle de vision en degrés
+        self.view_angle = 120  # Angle de vision en degrés
         self.direction = (1, 0)  # Direction initiale de la vue vers la droite (vecteur x=1, y=0)
         
         self.storage_inventory = Inventory(storage_capacity)  # Pour les objets stockés

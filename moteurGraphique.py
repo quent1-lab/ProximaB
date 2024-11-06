@@ -462,6 +462,9 @@ class Camera:
                         if vision_polygon:
                             # Obtenir les points du polygone
                             points = list(vision_polygon.exterior.coords)
+                            # Ajouter les coordonnées du PNJ (centre du cône de vision)
+                            pnj_position = (entity.x, entity.y)
+                            
                             # Convertir les points en coordonnées d'écran
                             screen_points = [
                                 (
@@ -470,8 +473,19 @@ class Camera:
                                 )
                                 for x, y in points
                             ]
-                            # Dessiner le polygone
-                            pygame.draw.polygon(self.screen, (255, 255, 0, 100), screen_points)
+                            screen_points.pop(-1)
+                            screen_points.append((
+                                int((pnj_position[0] - self.camera_center_x + self.screen_width / 2 / self.scale) * self.scale),
+                                int((pnj_position[1] - self.camera_center_y + self.screen_height / 2 / self.scale) * self.scale)
+                            ))  
+                            # Créer une surface avec un canal alpha (transparence)
+                            transparent_surface = pygame.Surface((self.screen_width, self.screen_height), pygame.SRCALPHA)
+                            
+                            # Dessiner le polygone sur la surface transparente
+                            pygame.draw.polygon(transparent_surface, (255, 255, 0, 100), screen_points)
+                            
+                            # Blitter la surface transparente sur l'écran principal
+                            self.screen.blit(transparent_surface, (0, 0))
                 
         # Ecriture du nombre de chunks chargés
         text = self.font.render(f"Chunks loaded: {len(self.world.loaded_chunks)}", True, (255, 255, 255))

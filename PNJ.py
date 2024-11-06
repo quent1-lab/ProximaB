@@ -80,7 +80,9 @@ class PNJ(Entity):
         local_y = int(y % self.config['chunk_size'])
         if 0 <= local_x < self.config['chunk_size'] and 0 <= local_y < self.config['chunk_size']:
             tile = chunk.tiles[local_x][local_y]
-            return tile.biome not in ['Mountains', 'Water']
+            if tile.biome in ["Water", "Forest"]:
+                self.memory.memorize_resource(tile.biome, x, y)
+            return tile.biome not in ['Mountains']
         return False
 
     def move_to(self, target):
@@ -221,10 +223,17 @@ class PNJMemory:
     def __init__(self):
         """Mémoire des PNJ pour stocker les zones explorées sous forme de polygones."""
         self.viewed_polygons = []  # Liste des polygones de zones vues
+        self.resources = {}  # Dictionnaire des ressources connues
 
     def memorize_area(self, polygon):
         """Ajoute un polygone représentant une nouvelle zone visible."""
         self.viewed_polygons.append(polygon)
+    
+    def memorize_resource(self, resource_type, x, y):
+        """Mémorise la position d'une ressource spécifique."""
+        if resource_type not in self.resources:
+            self.resources[resource_type] = []
+        self.resources[resource_type].append((x, y))
 
     def get_discovered_area(self):
         # Assurez-vous que viewed_polygons est une liste de polygones
@@ -244,10 +253,7 @@ class PNJMemory:
     def has_resource(self, resource_type):
         """Vérifie si des ressources de ce type sont connues."""
         # Cherche dans les chunks découverts
-        for chunk_x, chunk_y in self.discovered_chunks:
-            if self.get_resource(resource_type, chunk_x, chunk_y):
-                return True
-        return False
+        return resource_type in self.resources
     
     def find_closest_resource(self, x,y,resource_type):
         """Trouve la ressource la plus proche du PNJ."""
