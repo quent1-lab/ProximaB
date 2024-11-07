@@ -12,7 +12,7 @@ class PNJ(Entity):
         
         self.pathfinder = Pathfinding(world)
         self.behavior_manager = BehaviorManager(self)
-        self.memory = PNJMemory()  # Mémoire pour stocker les emplacements des ressources
+        self.memory = PNJMemory(self)  # Mémoire pour stocker les emplacements des ressources
         
         self.needs = {'hunger': 100, 'thirst': 100, 'energy': 100}
         self.target_location = None
@@ -220,11 +220,28 @@ class ExploreTask(Task):
             self.pnj.move_to(self.pnj.target_location)
 
 class PNJMemory:
-    def __init__(self):
+    def __init__(self, pnj):
         """Mémoire des PNJ pour stocker les zones explorées sous forme de polygones."""
         self.viewed_polygons = []  # Liste des polygones de zones vues
         self.resources = {}  # Dictionnaire des ressources connues
+        self.pnj = pnj
+        self.init_memory()
+    
+    def init_memory(self):
+        """ Mémorise par défaut la zone visible par le PNJ."""
+        radius = self.pnj.vision_range
+        center_x, center_y = self.pnj.x, self.pnj.y
 
+        # Génère un polygone circulaire pour la zone visible
+        circle_points = []
+        for i in range(360):
+            angle = math.radians(i)
+            x = center_x + radius * math.cos(angle)
+            y = center_y + radius * math.sin(angle)
+            circle_points.append((x, y))
+        
+        self.viewed_polygons.append(Polygon(circle_points))
+        
     def memorize_area(self, polygon):
         """Ajoute un polygone représentant une nouvelle zone visible."""
         self.viewed_polygons.append(polygon)
@@ -259,13 +276,11 @@ class PNJMemory:
         """Trouve la ressource la plus proche du PNJ."""
         min_distance = float('inf')
         closest_resource = None
-        for chunk_x, chunk_y in self.discovered_chunks:
-            for resource in self.resources[resource_type]:
-                distance = math.sqrt((x - resource[0]) ** 2 + (y - resource[1]) ** 2)
-                if distance < min_distance:
-                    min_distance = distance
-                    closest_resource = resource
-        return closest_resource
+        # Récupère le chunk de la position actuelle du PNJ
+        chunk_x = int(x // self.config['chunk_size'])
+        chunk_y = int(y // self.config['chunk_size'])
+        chunk = self.world.get_chunk(chunk_x, chunk_y)
+        
     
     def get_resource(self, resource_type, chunk_x=None, chunk_y=None):
         """Renvoie la position d'une ressource spécifique si elle est connue."""
