@@ -161,7 +161,7 @@ class BehaviorManager:
     def decide_next_task(self):
         """Décide de la prochaine tâche en fonction des besoins et de la mémoire."""
         if self.pnj.needs['thirst'] < 90 and self.pnj.memory.has_resource('Water'):
-            print(f"{self.pnj.name} a soif ! - {self.pnj.memory.get_resource('Water')}")
+            print(f"{self.pnj.name} a soif !")
             return DrinkTask(self.pnj)
         elif self.pnj.needs['hunger'] < 70 and self.pnj.memory.has_resource('Food'):
             print(f"{self.pnj.name} a faim !")
@@ -193,7 +193,7 @@ class DrinkTask(Task):
                 if distance < min_distance:
                     min_distance = distance
                     target = resource
-            print(f"{self.pnj.name} se dirige vers la ressource en eau la plus proche : {target}")
+            # print(f"{self.pnj.name} se dirige vers la ressource en eau la plus proche : {target}")
             self.pnj.move_to(target)
             if self.pnj.is_at_target():
                 self.pnj.consume_water(delta_time)
@@ -220,18 +220,19 @@ class ExploreTask(Task):
             self.pnj.move_to(self.pnj.target_location)
 
 class PNJMemory:
-    def __init__(self, pnj):
+    def __init__(self, pnj, cache_size=100):
         """Mémoire des PNJ pour stocker les zones explorées sous forme de polygones."""
         self.viewed_polygons = []  # Liste des polygones de zones vues
         self.resources = {}  # Dictionnaire des ressources connues
         self.pnj = pnj
+        self.cache_size = cache_size  # Nombre de polygones avant de faire une union globale
         self.init_memory()
     
     def init_memory(self):
         """ Mémorise par défaut la zone visible par le PNJ."""
         radius = self.pnj.vision_range
         center_x, center_y = self.pnj.x, self.pnj.y
-
+        
         # Génère un polygone circulaire pour la zone visible
         circle_points = []
         for i in range(360):
@@ -240,11 +241,22 @@ class PNJMemory:
             y = center_y + radius * math.sin(angle)
             circle_points.append((x, y))
         
-        self.viewed_polygons.append(Polygon(circle_points))
-        
-    def memorize_area(self, polygon):
-        """Ajoute un polygone représentant une nouvelle zone visible."""
-        self.viewed_polygons.append(polygon)
+        self.memorize_area(Polygon(circle_points))
+            
+    def memorize_area(self, new_polygon):
+        """Mémorise une nouvelle zone explorée."""
+        simplified_polygon = new_polygon.simplify(2.0, preserve_topology=True)
+        self.viewed_polygons.append(simplified_polygon)
+
+        # Effectuer l'union seulement si le cache atteint une certaine taille
+        if len(self.viewed_polygons) >= self.cache_size:
+            self._consolidate_memory()
+
+    def _consolidate_memory(self):
+        """Consolide les polygones en une seule opération."""
+        if self.viewed_polygons:
+            consolidated_polygon = unary_union(self.viewed_polygons)
+            self.viewed_polygons = [consolidated_polygon]
     
     def memorize_resource(self, resource_type, x, y):
         """Mémorise la position d'une ressource spécifique."""
@@ -280,18 +292,12 @@ class PNJMemory:
         chunk_x = int(x // self.config['chunk_size'])
         chunk_y = int(y // self.config['chunk_size'])
         chunk = self.world.get_chunk(chunk_x, chunk_y)
-        
-    
-    def get_resource(self, resource_type, chunk_x=None, chunk_y=None):
-        """Renvoie la position d'une ressource spécifique si elle est connue."""
-        if chunk_x and chunk_y:
-            for resource in self.resources[resource_type]:
-                if resource in self.resources[resource_type]:
-                    return resource
-            return None
-        else:
-            for chunk_x, chunk_y in self.discovered_chunks:
-                for resource in self.resources[resource_type]:
-                    if resource in self.resources[resource_type]:
-                        return resource
-            return None
+        local_x = int(x % self.config['chunk_size'])
+        local_y = int(y % self.config['chunk_size'])
+        # Parcours les ressources connues
+        for resource in chunk.biome_info[resource_type]:
+            distance = math.sqrt((local_x - resource[0]) ** 2 + (local_y - resource[1]) ** 2)
+            if distance < min_distance:
+                min_distance = distance
+                closest_resource = resource
+        return closest_resource
