@@ -44,10 +44,7 @@ class PNJ(Entity):
     def explore_and_memorize_view(self):
         """Utilise le champ de vision pour mémoriser les zones visibles."""
         visible_points = self.cast_rays(self.vision_range, self.view_angle)
-        if visible_points:
-            # Créer un polygone avec les points visibles
-            view_polygon = MultiPoint(visible_points).convex_hull
-            self.memory.memorize_area(view_polygon)
+        self.memory.memorize_chunk(self.actual_chunk.x, self.actual_chunk.y)
 
     def cast_rays(self, vision_range, angle):
         """Retourne une liste de points visibles en utilisant un casting de rayons."""
@@ -110,28 +107,29 @@ class PNJ(Entity):
     def move_to(self, target):
         """Déplace le PNJ vers une cible spécifique en fonction de son environnement."""
         self.target_location = target
+        
         if not self.pathfinder.is_target_reached(self.x, self.y, target):
-            # Analyser l'environnement immédiat
-            directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]  # Gauche, Droite, Haut, Bas
-            best_direction = None
-            min_distance = float('inf')
-
-            for dx, dy in directions:
-                new_x = self.x + dx
-                new_y = self.y + dy
-                if self.is_passable(new_x, new_y):
-                    distance = math.sqrt((target[0] - new_x) ** 2 + (target[1] - new_y) ** 2)
-                    if distance < min_distance:
-                        min_distance = distance
-                        best_direction = (dx, dy)
-
-            if best_direction:
-                # Mise à jour de vx, vy
-                self.vx = best_direction[0] * self.speed
-                self.vy = best_direction[1] * self.speed
+            # Calculer le vecteur de direction vers la cible
+            dir_x = target[0] - self.x
+            dir_y = target[1] - self.y
+            distance = math.sqrt(dir_x ** 2 + dir_y ** 2)
+            
+            if distance > 0:
+                # Normaliser le vecteur de direction
+                dir_x /= distance
+                dir_y /= distance
+                
+                # Mettre à jour la vitesse pour des déplacements fluides
+                self.vx = dir_x * self.speed
+                self.vy = dir_y * self.speed
+            else:
+                # Si déjà à la cible, arrêter le PNJ
+                self.vx = 0
+                self.vy = 0
         else:
             self.vx = 0
             self.vy = 0
+
 
     def get_random_target(self):
         """Génère une position cible aléatoire dans le monde, privilégiant les chunks non connus."""
@@ -204,6 +202,7 @@ class Task:
 
 class DrinkTask(Task):
     def __init__(self,pnj):
+        super().__init__(pnj)
         self.target = None
         self.pnj = pnj
         
@@ -247,48 +246,16 @@ class ExploreTask(Task):
             self.pnj.move_to(self.pnj.target_location)
 
 class PNJMemory:
-    def __init__(self, pnj, cache_size=100):
-        """Mémoire des PNJ pour stocker les zones explorées sous forme de polygones."""
-        self.viewed_polygons = []  # Liste des polygones de zones vues
+    def __init__(self, pnj):
+        """Mémoire des PNJ pour stocker les chunks découverts."""
+        self.discovered_chunks = set()  # Ensemble des coordonnées des chunks connus
         self.resources = {}  # Dictionnaire des ressources connues
         self.pnj = pnj
-        self.cache_size = cache_size  # Nombre de polygones avant de faire une union globale
-        
-        self.optimizer = PolygonOptimizer()
-        
-        self.init_memory()
-    
-    def init_memory(self):
-        """ Mémorise par défaut la zone visible par le PNJ."""
-        radius = self.pnj.vision_range
-        center_x, center_y = self.pnj.x, self.pnj.y
-        
-        # Génère un polygone circulaire pour la zone visible
-        circle_points = []
-        for i in range(360):
-            angle = math.radians(i)
-            x = center_x + radius * math.cos(angle)
-            y = center_y + radius * math.sin(angle)
-            circle_points.append((x, y))
-        
-        self.memorize_area(Polygon(circle_points))
-            
-    def memorize_area(self, new_polygon):
-        """Mémorise une nouvelle zone explorée."""
-        simplified_polygon = new_polygon.simplify(1.2, preserve_topology=True)
-        #simplified_polygon = self.optimizer.optimize_polygon(new_polygon, tolerance=0.8, angle_threshold=5)
-        self.viewed_polygons.append(simplified_polygon)
 
-        # Effectuer l'union seulement si le cache atteint une certaine taille
-        if len(self.viewed_polygons) >= self.cache_size:
-            self._consolidate_memory()
+    def memorize_chunk(self, chunk_x, chunk_y):
+        """Mémorise la position d'un chunk découvert."""
+        self.discovered_chunks.add((chunk_x, chunk_y))
 
-    def _consolidate_memory(self):
-        """Consolide les polygones en une seule opération."""
-        if self.viewed_polygons:
-            consolidated_polygon = unary_union(self.viewed_polygons)
-            self.viewed_polygons = [consolidated_polygon]
-    
     def memorize_resource(self, resource_type, x, y):
         """Mémorise la position d'une ressource spécifique."""
         if resource_type not in self.resources:
@@ -296,40 +263,15 @@ class PNJMemory:
         if (x, y) not in self.resources[resource_type]:
             self.resources[resource_type].append((x, y))
 
-    def get_discovered_area(self):
-        # Assurez-vous que viewed_polygons est une liste de polygones
-        if isinstance(self.viewed_polygons, list) and all(isinstance(p, Polygon) for p in self.viewed_polygons):
-            # Utiliser unary_union pour combiner les polygones
-            return unary_union(self.viewed_polygons)
-        else:
-            raise TypeError("viewed_polygons doit être une liste de polygones")
-    
     def is_chunk_known(self, chunk_x, chunk_y):
         """Vérifie si un chunk spécifique est déjà connu."""
-        for polygon in self.viewed_polygons:
-            if polygon.contains(Point(chunk_x, chunk_y)):
-                return True
-        return False
-    
+        return (chunk_x, chunk_y) in self.discovered_chunks
+
+    def get_all_discovered_chunks(self):
+        """Retourne la liste des chunks découverts."""
+        return list(self.discovered_chunks)
+
     def has_resource(self, resource_type):
-        """Vérifie si des ressources de ce type sont connues."""
-        # Cherche dans les chunks découverts
+        """Vérifie si une ressource spécifique est connue."""
         return resource_type in self.resources
-    
-    def find_closest_resource(self, x,y,resource_type):
-        """Trouve la ressource la plus proche du PNJ."""
-        min_distance = float('inf')
-        closest_resource = None
-        # Récupère le chunk de la position actuelle du PNJ
-        chunk_x = int(x // self.config['chunk_size'])
-        chunk_y = int(y // self.config['chunk_size'])
-        chunk = self.world.get_chunk(chunk_x, chunk_y)
-        local_x = int(x % self.config['chunk_size'])
-        local_y = int(y % self.config['chunk_size'])
-        # Parcours les ressources connues
-        for resource in chunk.biome_info[resource_type]:
-            distance = math.sqrt((local_x - resource[0]) ** 2 + (local_y - resource[1]) ** 2)
-            if distance < min_distance:
-                min_distance = distance
-                closest_resource = resource
-        return closest_resource
+

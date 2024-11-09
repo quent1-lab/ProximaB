@@ -207,7 +207,7 @@ def main2():
     profiler.disable()
     stats = pstats.Stats(profiler)
     stats.sort_stats(pstats.SortKey.TIME)
-    #stats.print_stats()
+    stats.print_stats()
 
 if __name__ == "__main__":
     main2()

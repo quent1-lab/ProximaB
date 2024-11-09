@@ -1,6 +1,7 @@
 import json, pygame, uuid, perlin_noise, os, json, numpy as np
 from chunk_ import Chunk
-from shapely.geometry import MultiPolygon
+from shapely.geometry import Polygon
+from shapely.ops import unary_union
 
 # Charger la configuration depuis un fichier JSON
 def load_config(file_path):
@@ -433,27 +434,34 @@ class Camera:
                 # Afficher la zone découverte par le PNJ
                 if entity.entity_type == "PNJ":
                     if entity.memory:
-                        polygon = entity.memory.get_discovered_area()
-                        if polygon:
-                            # Si c'est un MultiPolygon, itérer sur chaque polygone
-                            if isinstance(polygon, MultiPolygon):
-                                polygons = polygon.geoms
-                            else:
-                                polygons = [polygon]
-
-                            for poly in polygons:
-                                # Obtenir les points du polygone
-                                points = list(poly.exterior.coords)
-                                # Convertir les points en coordonnées d'écran
-                                screen_points = [
-                                    (
-                                        int((x - self.camera_center_x + self.screen_width / 2 / self.scale) * self.scale),
-                                        int((y - self.camera_center_y + self.screen_height / 2 / self.scale) * self.scale)
-                                    )
-                                    for x, y in points
-                                ]
-                                # Dessiner le polygone
-                                pygame.draw.polygon(self.screen, (0, 255, 255, 100), screen_points, 1)
+                        chunks = entity.memory.get_all_discovered_chunks()
+                        # A partir des chunk découvert, afficher un polygone des bordures des chunks découverts
+                        polygons = []
+                        for chunk in chunks:
+                            chunk_x, chunk_y = chunk
+                            x = chunk_x * self.chunk_size
+                            y = chunk_y * self.chunk_size
+                            # Créer un polygone pour chaque chunk
+                            chunk_polygon = Polygon([
+                                (x, y),
+                                (x + self.chunk_size, y),
+                                (x + self.chunk_size, y + self.chunk_size),
+                                (x, y + self.chunk_size)
+                            ])
+                            polygons.append(chunk_polygon)
+                        if polygons:
+                            # Créer un polygone à partir des points
+                            unified_polygon = unary_union(polygons)
+                            # Convertir les points en coordonnées d'écran
+                            screen_points = [
+                                (
+                                    int((x - self.camera_center_x + self.screen_width / 2 / self.scale) * self.scale),
+                                    int((y - self.camera_center_y + self.screen_height / 2 / self.scale) * self.scale)
+                                )
+                                for x, y in unified_polygon.exterior.coords
+                            ]
+                            pygame.draw.polygon(self.screen, (255, 255, 0, 100), screen_points, 1)
+                            
                 
                         # Afficher la zone visible par le PNJ
                     if entity.vision_range > 0:

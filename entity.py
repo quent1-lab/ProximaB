@@ -21,11 +21,10 @@ class Entity:
         
         self.health = 100  # Points de vie de l'entité
         self.vision_range = 10  # Portée de vision de l'entité
-        
-        self.event_manager = world.event_manager
-        
         self.view_angle = 120  # Angle de vision en degrés
         self.direction = (1, 0)  # Direction initiale de la vue vers la droite (vecteur x=1, y=0)
+        
+        self.event_manager = world.event_manager
         
         self.storage_inventory = Inventory(storage_capacity)  # Pour les objets stockés
         self.resource_inventory = Inventory(float('inf'))     # Pour les ressources propres de l'entité
