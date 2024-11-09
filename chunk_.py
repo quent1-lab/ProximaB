@@ -81,7 +81,7 @@ class Chunk:
                 # Assigner le biome avec des transitions douces
                 biome = self.get_biome_with_transition(noise_value)
                 # Mettre à jour le compteur de biomes dans le chunk
-                self.update_biome_info(biome)
+                self.update_biome_info(biome, x + self.x_offset, y + self.y_offset)
                 # Créer une tuile avec les données initiales
                 chunk[x][y] = Tile(x + self.x_offset, y + self.y_offset, biome, config, chunk_lock=self.chunk_lock, entity_lock=self.entity_lock)
         
@@ -103,15 +103,14 @@ class Chunk:
                 return biome['name']
         return 'Unknown'
 
-    def update_biome_info(self, biome_name):
+    def update_biome_info(self, biome_name, x=None, y=None):
         """Met à jour les infos sur les biomes regroupe les ilots de même type dans le chunk."""
         if biome_name in self.biome_info:
             # Vérifier si le biome est adjacent à un autre biome du même type
-            for x, y in self.biome_info[biome_name]:
-                if self.is_adjacent_to_same_biome(x, y, biome_name):
-                    self.biome_info[biome_name].add((x, y))
+            self.biome_info[biome_name].add((x, y))
         else:
             self.biome_info[biome_name] = set()
+            self.biome_info[biome_name].add((x, y))
             
     def is_adjacent_to_same_biome(self, x, y, biome_name):
         """Vérifie si une tuile est adjacente à une tuile du même type de biome."""
@@ -177,7 +176,8 @@ class Chunk:
         return {
             'x': self.x,
             'y': self.y,
-            'tiles': [[tile.to_dict() for tile in row] for row in self.tiles]
+            'tiles': [[tile.to_dict() for tile in row] for row in self.tiles],
+            'biomes': {k: [list(v) for v in values] for k, values in self.biome_info.items()}  # Convertir les ensembles en listes
         }
 
     @classmethod
@@ -185,6 +185,7 @@ class Chunk:
         """Crée un chunk à partir d'un dictionnaire sérialisé."""
         chunk = cls(data['x'], data['y'], noise_generator, config, chunk_lock, entity_lock, True)
         chunk.tiles = [[Tile.from_dict(tile_data, config) for tile_data in row] for row in data['tiles']]
+        chunk.biome_info = {k: set(tuple(v) for v in values) for k, values in data['biomes'].items()}
         return chunk
 
     def __repr__(self):

@@ -43,7 +43,6 @@ class PNJ(Entity):
 
     def explore_and_memorize_view(self):
         """Utilise le champ de vision pour mémoriser les zones visibles."""
-        visible_points = self.cast_rays(self.vision_range, self.view_angle)
         self.memory.memorize_chunk(self.actual_chunk.x, self.actual_chunk.y)
 
     def cast_rays(self, vision_range, angle):
@@ -78,8 +77,6 @@ class PNJ(Entity):
         local_y = int(y % self.config['chunk_size'])
         if 0 <= local_x < self.config['chunk_size'] and 0 <= local_y < self.config['chunk_size']:
             tile = self.actual_chunk.tiles[local_x][local_y]
-            if tile.biome in ["Water", "Forest"]:
-                self.memory.memorize_resource(tile.biome, x, y)
             return tile.biome not in ['Mountains']
         return False
     
@@ -129,7 +126,6 @@ class PNJ(Entity):
         else:
             self.vx = 0
             self.vy = 0
-
 
     def get_random_target(self):
         """Génère une position cible aléatoire dans le monde, privilégiant les chunks non connus."""
@@ -254,14 +250,21 @@ class PNJMemory:
 
     def memorize_chunk(self, chunk_x, chunk_y):
         """Mémorise la position d'un chunk découvert."""
-        self.discovered_chunks.add((chunk_x, chunk_y))
+        if self.discovered_chunks:
+            if (chunk_x, chunk_y) not in self.discovered_chunks:
+                self.discovered_chunks.add((chunk_x, chunk_y))
+                self.memorize_resource(self.pnj.world.get_chunk(chunk_x, chunk_y))
+        else:
+            self.discovered_chunks.add((chunk_x, chunk_y))
+            self.memorize_resource(self.pnj.world.get_chunk(chunk_x, chunk_y))
 
-    def memorize_resource(self, resource_type, x, y):
+    def memorize_resource(self, chunk):
         """Mémorise la position d'une ressource spécifique."""
-        if resource_type not in self.resources:
-            self.resources[resource_type] = []
-        if (x, y) not in self.resources[resource_type]:
-            self.resources[resource_type].append((x, y))
+        for resource, tiles in chunk.biome_info.items():
+            if resource in self.resources:
+                self.resources[resource].update(tiles)
+            else:
+                self.resources[resource] = set(tiles)
 
     def is_chunk_known(self, chunk_x, chunk_y):
         """Vérifie si un chunk spécifique est déjà connu."""
