@@ -1,6 +1,7 @@
 from entity import Entity, Pathfinding
 from shapely.geometry import Polygon, MultiPoint, Point
 from shapely.ops import unary_union
+from polygon import PolygonOptimizer
 import random, math
 
 class PNJ(Entity):
@@ -226,6 +227,9 @@ class PNJMemory:
         self.resources = {}  # Dictionnaire des ressources connues
         self.pnj = pnj
         self.cache_size = cache_size  # Nombre de polygones avant de faire une union globale
+        
+        self.optimizer = PolygonOptimizer()
+        
         self.init_memory()
     
     def init_memory(self):
@@ -245,7 +249,7 @@ class PNJMemory:
             
     def memorize_area(self, new_polygon):
         """Mémorise une nouvelle zone explorée."""
-        simplified_polygon = new_polygon.simplify(2.0, preserve_topology=True)
+        simplified_polygon = self.optimizer.optimize_polygon(new_polygon, tolerance=0.6, angle_threshold=5)
         self.viewed_polygons.append(simplified_polygon)
 
         # Effectuer l'union seulement si le cache atteint une certaine taille

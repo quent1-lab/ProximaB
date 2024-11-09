@@ -380,16 +380,16 @@ class Camera:
         """Optimisation en utilisant plusieurs threads pour traiter plusieurs chunks en parallèle."""
         rectangles = []
         
-        def process_chunk(chunk_data):
-            """Exécuter le greedy meshing sur un chunk donné."""
-            return self.greedy_mesh_optimized(chunk_data)
+        # def process_chunk(chunk_data):
+        #     """Exécuter le greedy meshing sur un chunk donné."""
+        #     return self.greedy_mesh_optimized(chunk_data)
 
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            futures = [executor.submit(process_chunk, chunk) for chunk in visible_tiles_by_chunk]
-            for future in concurrent.futures.as_completed(futures):
-                rectangles.extend(future.result())
+        # with concurrent.futures.ThreadPoolExecutor() as executor:
+        #     futures = [executor.submit(process_chunk, chunk) for chunk in visible_tiles_by_chunk]
+        #     for future in concurrent.futures.as_completed(futures):
+        #         rectangles.extend(future.result())
 
-        return rectangles
+        # return rectangles
 
     def render(self):
         """Affiche le monde et les PNJ avec déplacement du décor en fonction de la caméra."""
