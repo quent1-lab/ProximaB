@@ -17,6 +17,8 @@ class PNJ(Entity):
         
         self.needs = {'hunger': 100, 'thirst': 100, 'energy': 100}
         self.target_location = None
+        self.actual_chunk = None
+        self.actual_chunk_poly = None
 
     def init_name(self):
         """Initialise le nom du PNJ."""
@@ -25,6 +27,7 @@ class PNJ(Entity):
     
     def update(self, delta_time):
         """Met à jour l'état du PNJ, gère les besoins et exécute des tâches."""
+        self.check_pnj_in_chunk()
         self.update_needs(delta_time)
         self.behavior_manager.update_behavior(delta_time)
         super().move(delta_time)
@@ -74,17 +77,35 @@ class PNJ(Entity):
 
     def is_passable(self, x, y):
         """Vérifie si la tuile à la position (x, y) est passable."""
-        chunk_x = int(x // self.config['chunk_size'])
-        chunk_y = int(y // self.config['chunk_size'])
-        chunk = self.world.get_chunk(chunk_x, chunk_y)
         local_x = int(x % self.config['chunk_size'])
         local_y = int(y % self.config['chunk_size'])
         if 0 <= local_x < self.config['chunk_size'] and 0 <= local_y < self.config['chunk_size']:
-            tile = chunk.tiles[local_x][local_y]
+            tile = self.actual_chunk.tiles[local_x][local_y]
             if tile.biome in ["Water", "Forest"]:
                 self.memory.memorize_resource(tile.biome, x, y)
             return tile.biome not in ['Mountains']
         return False
+    
+    def is_in_chunk(self, x, y):
+        """Vérifie si une position spécifique est dans le chunk actuel du PNJ."""
+        if not self.actual_chunk_poly:
+            return False
+        return self.actual_chunk_poly.contains(Point(x, y))
+    
+    def set_chunk_actual(self):
+        """Définit le chunk actuel du PNJ en fonction de sa position actuelle."""
+        chunk_x = int(self.x // self.config['chunk_size'])
+        chunk_y = int(self.y // self.config['chunk_size'])
+        chunk_size = self.config['chunk_size']
+        self.actual_chunk_poly = Polygon([(chunk_x, chunk_y), (chunk_x * chunk_size + chunk_size, chunk_y),
+                                     (chunk_x * chunk_size + chunk_size, chunk_y * chunk_size + chunk_size),
+                                     (chunk_x, chunk_y * chunk_size + chunk_size)])
+        self.actual_chunk = self.world.get_chunk(chunk_x, chunk_y)
+    
+    def check_pnj_in_chunk(self):
+        """Vérifie si le PNJ est toujours dans le chunk actuel."""
+        if not self.is_in_chunk(self.x, self.y):
+            self.set_chunk_actual()
 
     def move_to(self, target):
         """Déplace le PNJ vers une cible spécifique en fonction de son environnement."""
@@ -182,23 +203,28 @@ class Task:
         return self.complete
 
 class DrinkTask(Task):
+    def __init__(self,pnj):
+        self.target = None
+        self.pnj = pnj
+        
     def execute(self, delta_time):
         if not self.pnj.memory.has_resource('Water'):
             self.pnj.find_water()
         else:
             # Trouve la ressource en eau la plus proche
-            target = None
-            min_distance = float('inf')
-            for resource in self.pnj.memory.resources["Water"]:
-                distance = math.sqrt((self.pnj.x - resource[0]) ** 2 + (self.pnj.y - resource[1]) ** 2)
-                if distance < min_distance:
-                    min_distance = distance
-                    target = resource
-            # print(f"{self.pnj.name} se dirige vers la ressource en eau la plus proche : {target}")
-            self.pnj.move_to(target)
+            if not self.target:
+                min_distance = float('inf')
+                for resource in self.pnj.memory.resources["Water"]:
+                    distance = math.sqrt((self.pnj.x - resource[0]) ** 2 + (self.pnj.y - resource[1]) ** 2)
+                    if distance < min_distance:
+                        min_distance = distance
+                        self.target = resource
+            
+            self.pnj.move_to(self.target)
             if self.pnj.is_at_target():
                 self.pnj.consume_water(delta_time)
-                self.complete = True
+                if self.pnj.needs['thirst'] >= 100:
+                    self.complete = True
 
 class EatTask(Task):
     def execute(self, delta_time):
@@ -249,7 +275,8 @@ class PNJMemory:
             
     def memorize_area(self, new_polygon):
         """Mémorise une nouvelle zone explorée."""
-        simplified_polygon = self.optimizer.optimize_polygon(new_polygon, tolerance=0.6, angle_threshold=5)
+        simplified_polygon = new_polygon.simplify(1.2, preserve_topology=True)
+        #simplified_polygon = self.optimizer.optimize_polygon(new_polygon, tolerance=0.8, angle_threshold=5)
         self.viewed_polygons.append(simplified_polygon)
 
         # Effectuer l'union seulement si le cache atteint une certaine taille
@@ -266,7 +293,8 @@ class PNJMemory:
         """Mémorise la position d'une ressource spécifique."""
         if resource_type not in self.resources:
             self.resources[resource_type] = []
-        self.resources[resource_type].append((x, y))
+        if (x, y) not in self.resources[resource_type]:
+            self.resources[resource_type].append((x, y))
 
     def get_discovered_area(self):
         # Assurez-vous que viewed_polygons est une liste de polygones
