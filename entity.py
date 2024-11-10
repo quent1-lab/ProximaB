@@ -369,7 +369,7 @@ class Pathfinding:
             return 1  # Terrain facile
         return 2  # Coût par défaut
 
-    def a_star(self, start, goal, max_iterations=2500, *args):
+    def a_star(self, start, goal, vision_range, max_iterations=2500, *args):
         """Implémente l'algorithme A* pour trouver le chemin optimal entre start et goal."""
         open_set = []
         heapq.heappush(open_set, (0, start))  # (F, (x, y))
@@ -385,6 +385,16 @@ class Pathfinding:
             _, current = heapq.heappop(open_set)
             if current == goal:
                 print(f"Chemin trouvé après {iterations} itérations.")
+                path = self.simplify_path(self.reconstruct_path(came_from, current))
+                if path[0] == start:
+                    path.pop(0)  # Enlève le point de départ
+                if callback_set_path:
+                    callback_set_path(path)
+                path_found = True  # Indique que le chemin a été trouvé
+                break  # Sort de la boucle
+
+            # Vérifier si la distance entre le nœud actuel et le point de départ dépasse la portée de vision
+            if self.heuristic(start, current) > vision_range:
                 path = self.simplify_path(self.reconstruct_path(came_from, current))
                 if path[0] == start:
                     path.pop(0)  # Enlève le point de départ
@@ -457,7 +467,3 @@ class Pathfinding:
             simplified_path[-1] = (last_node[0] + 0.5, last_node[1] + 0.5)
 
         return simplified_path
-
-    def is_target_reached(self, x, y, target, threshold=0.05):
-        """Vérifie si la cible a été atteinte plus ou moins à une certaine distance."""
-        return math.sqrt((target[0] - x) ** 2 + (target[1] - y) ** 2) < threshold

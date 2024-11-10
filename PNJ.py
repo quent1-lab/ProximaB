@@ -19,6 +19,7 @@ class PNJ(Entity):
         self.target_location = None
         self.actual_chunk = None
         self.actual_chunk_poly = None
+        self.path = None
 
     def init_name(self):
         """Initialise le nom du PNJ."""
@@ -73,11 +74,12 @@ class PNJ(Entity):
 
     def is_passable(self, x, y):
         """Vérifie si la tuile à la position (x, y) est passable."""
+        chunk = self.world.get_chunk_from_position(x, y)
         local_x = int(x % self.config['chunk_size'])
         local_y = int(y % self.config['chunk_size'])
         if 0 <= local_x < self.config['chunk_size'] and 0 <= local_y < self.config['chunk_size']:
-            tile = self.actual_chunk.tiles[local_x][local_y]
-            return tile.biome not in ['Mountains']
+            tile = chunk.tiles[local_x][local_y]
+            return tile.biome not in ['Water','Mountains']
         return False
     
     def is_in_chunk(self, x, y):
@@ -105,7 +107,11 @@ class PNJ(Entity):
         """Déplace le PNJ vers une cible spécifique en fonction de son environnement."""
         self.target_location = target
         
-        if not self.pathfinder.is_target_reached(self.x, self.y, target):
+        if self.path:
+            self.follow_path()
+            return
+        
+        if not self.is_at_target():
             # Calculer le vecteur de direction vers la cible
             dir_x = target[0] - self.x
             dir_y = target[1] - self.y
@@ -116,9 +122,16 @@ class PNJ(Entity):
                 dir_x /= distance
                 dir_y /= distance
                 
-                # Mettre à jour la vitesse pour des déplacements fluides
-                self.vx = dir_x * self.speed
-                self.vy = dir_y * self.speed
+                # Vérifier si le chemin est passable
+                next_x = self.x + dir_x * 0.8
+                next_y = self.y + dir_y * 0.8
+                if self.is_passable(next_x, next_y):
+                    # Mettre à jour la vitesse pour des déplacements fluides
+                    self.vx = dir_x * self.speed
+                    self.vy = dir_y * self.speed
+                else:
+                    # Si le chemin n'est pas passable, éviter l'obstacle
+                    self.path = self.pathfinder.a_star((self.x, self.y), target, self.vision_range)
             else:
                 # Si déjà à la cible, arrêter le PNJ
                 self.vx = 0
@@ -126,6 +139,56 @@ class PNJ(Entity):
         else:
             self.vx = 0
             self.vy = 0
+    
+    def follow_path(self):
+        """Déplace le PNJ le long du chemin calculé par l'algorithme A*."""
+        if self.path:
+            next_node = self.path[0]
+            target = (next_node[0], next_node[1])
+            self.calculate_velocity(target)
+            
+            if self.is_at_target(target):
+                print(f"{self.name} atteint le point {target}")
+                self.path.pop()
+                if not self.path:
+                    self.target_location = None
+        
+    def calculate_velocity(self, target):
+        """Calcule le vecteur de direction vers la cible et met à jour la vitesse."""
+        dir_x = target[0] - self.x
+        dir_y = target[1] - self.y
+        distance = math.sqrt(dir_x ** 2 + dir_y ** 2)
+        
+        if distance > 0:
+            dir_x /= distance
+            dir_y /= distance
+            self.vx = dir_x * self.speed
+            self.vy = dir_y * self.speed
+        else:
+            self.vx = 0
+            self.vy = 0
+    
+    def distance(self, x1, y1, x2, y2):
+        """Calcule la distance euclidienne entre deux points."""
+        return math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
+
+    def avoid_obstacle(self):
+        """Évite les obstacles en trouvant une direction alternative."""
+        directions = [(1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (-1, -1), (1, -1), (-1, 1)]
+        best_direction = (0, 0)
+        min_distance = float('inf')
+        target = self.target_location
+        
+        for dx, dy in directions:
+            next_x = self.x + dx
+            next_y = self.y + dy
+            if self.is_passable(next_x, next_y):
+                dist = self.distance(next_x, next_y, target[0], target[1])
+                if dist < min_distance:
+                    min_distance = dist
+                    best_direction = (dx, dy)
+
+        return best_direction
 
     def get_random_target(self):
         """Génère une position cible aléatoire dans le monde, privilégiant les chunks non connus."""
@@ -136,15 +199,24 @@ class PNJ(Entity):
             chunk_x = target_x // self.config['chunk_size']
             chunk_y = target_y // self.config['chunk_size']
             if not self.memory.is_chunk_known(chunk_x, chunk_y):
-                return (target_x, target_y)
+                if self.is_passable(target_x, target_y):
+                    return (target_x, target_y)
+                
         # Si toutes les tentatives échouent, retourner une position aléatoire
-        return (self.x + random.randint(-100, 100), self.y + random.randint(-100, 100))
+        target = (random.randint(int(self.x - self.vision_range), int(self.x + self.vision_range)),
+                  random.randint(int(self.y - self.vision_range), int(self.y + self.vision_range)))
+        while not self.is_passable(target[0], target[1]):
+            target = (random.randint(int(self.x - self.vision_range), int(self.x + self.vision_range)),
+                      random.randint(int(self.y - self.vision_range), int(self.y + self.vision_range)))
+        return target
     
-    def is_at_target(self):
+    def is_at_target(self,target=None, threshold=0.1):
         """Vérifie si le PNJ est à la position cible."""
-        if not self.target_location:
+        if not target:
+            target = self.target_location
+        if not target:
             return False
-        return self.pathfinder.is_target_reached(self.x, self.y, self.target_location)
+        return math.sqrt((self.x - self.target_location[0]) ** 2 + (self.y - self.target_location[1]) ** 2) < threshold + self.size / 2
 
     def consume_water(self, delta_time):
         """Consomme de l'eau pour satisfaire la soif."""
@@ -208,12 +280,7 @@ class DrinkTask(Task):
         else:
             # Trouve la ressource en eau la plus proche
             if not self.target:
-                min_distance = float('inf')
-                for resource in self.pnj.memory.resources["Water"]:
-                    distance = math.sqrt((self.pnj.x - resource[0]) ** 2 + (self.pnj.y - resource[1]) ** 2)
-                    if distance < min_distance:
-                        min_distance = distance
-                        self.target = resource
+                self.target = self.pnj.memory.get_resource('Water')
             
             self.pnj.move_to(self.target)
             if self.pnj.is_at_target():
@@ -277,4 +344,33 @@ class PNJMemory:
     def has_resource(self, resource_type):
         """Vérifie si une ressource spécifique est connue."""
         return resource_type in self.resources
+
+    def find_resource(self, resource_type):
+        """Retourne la position la plus proche de la ressource spécifique."""
+        if resource_type in self.resources:
+            min_distance = float('inf')
+            min_position = None
+            for position in self.resources[resource_type]:
+                distance = math.sqrt((self.pnj.x - position[0]) ** 2 + (self.pnj.y - position[1]) ** 2)
+                if distance < min_distance:
+                    min_distance = distance
+                    min_position = position
+            return self.accessible_resource(min_position)
+        return None
+    
+    def accessible_resource(self, target):
+        """Retourne une position accessible à partir de la position cible."""
+        directions = [(1, 0), (-1, 0), (0, 1), (0, -1)]
+        for dx, dy in directions:
+            x, y = target[0] + dx, target[1] + dy
+            chunk = self.pnj.world.get_chunk_from_position(x, y)
+            if chunk.tiles[x - chunk.x_offset][y - chunk.y_offset].biome != "Water":
+                return (x+0.5, y+0.5)
+        return None
+    
+    def get_resource(self, resource_type):
+        """Retourne la position de la ressource spécifique."""
+        if resource_type in self.resources:
+            return self.find_resource(resource_type)
+        return None
 
