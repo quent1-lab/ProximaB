@@ -19,6 +19,8 @@ class Entity:
         self.on_ground = False  # Indique si l'entité est au sol
         self.in_water = False  # Indique si l'entité est dans l'eau
         
+        self.color = (255, 0, 0)  # Couleur par défaut
+        
         self.health = 100  # Points de vie de l'entité
         self.vision_range = 10  # Portée de vision de l'entité
         self.view_angle = 120  # Angle de vision en degrés
@@ -106,10 +108,10 @@ class Entity:
         new_y = self.y + self.vy * delta_time
         
         # Évitement des autres entités
-        self.avoid_collision(self.world.entities, delta_time)
+        #self.avoid_collision(self.world.entities, delta_time)
 
         # Vérifier les collisions avec le sol
-        self.on_ground = self.collides_with_ground(new_x, new_y)
+        #self.on_ground = self.collides_with_ground(new_x, new_y)
 
         # Mise à jour de la position
         self.x = new_x
@@ -155,16 +157,16 @@ class Entity:
                     self.vx -= dx / distance * avoidance_factor
                     self.vy -= dy / distance * avoidance_factor
 
-    def render(self, screen, scale, screen_x, screen_y, color=(255, 0, 0), shape='circle', **kwargs):
+    def render(self, screen, scale, screen_x, screen_y, shape='circle', **kwargs):
         """Affiche graphiquement l'entité sur l'écran avec des options de personnalisation."""
         # Convertir la position en pixels en fonction de l'échelle
         size_in_pixels = int(self.size * scale)
 
         # Dessiner l'entité en fonction de la forme spécifiée
         if shape == 'circle':
-            pygame.draw.circle(screen, color, (screen_x, screen_y), size_in_pixels // 2)
+            pygame.draw.circle(screen, self.color, (screen_x, screen_y), size_in_pixels // 2)
         elif shape == 'square':
-            pygame.draw.rect(screen, color, (screen_x - size_in_pixels // 2, screen_y - size_in_pixels // 2, size_in_pixels, size_in_pixels))
+            pygame.draw.rect(screen, self.color, (screen_x - size_in_pixels // 2, screen_y - size_in_pixels // 2, size_in_pixels, size_in_pixels))
         # Ajouter d'autres formes si nécessaire
         else:
             raise ValueError(f"Forme non supportée: {shape}")
@@ -198,6 +200,7 @@ class Animal(Entity):
     def __init__(self, name, x, y, world, energy=100, hunger=100, thirst=100):
         super().__init__(x, y, world, entity_type="animal")
         self.name = name
+        self.color = (0, 200, 0)  # Couleur verte par défaut
         self.is_alive = True
         self.speed = 0.6  # Vitesse de déplacement de base
         self.intelligence = 0.5  # Niveau d'intelligence de l'animal (peut influencer ses décisions)
@@ -308,7 +311,7 @@ class Animal(Entity):
         
     def render(self, screen, scale, screen_x, screen_y):
         if self.is_alive:
-            return super().render(screen, scale, screen_x, screen_y, color=(0, 200, 0), shape='square')
+            return super().render(screen, scale, screen_x, screen_y, shape='square')
     
     def __str__(self) -> str:
         return super().__str__() + f" Animal {self.name}"

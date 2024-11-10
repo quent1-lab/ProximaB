@@ -23,8 +23,10 @@ class PNJ(Entity):
 
     def init_name(self):
         """Initialise le nom du PNJ."""
-        names = ['Alice', 'Bob', 'Charlie', 'David', 'Eve', 'Frank', 'Grace', 'Hank', 'Ivy', 'Jack']
-        return random.choice(names)
+        names = [("Alice", "F", (100,20,150)), ("Bob", "M", (20,100,150)), ("Charlie", "M", (150,20,100)), ("Daisy", "F", (40,200,70)), ("Eve", "F", (200,200,20)), ("Frank", "M", (200,100,20)), ("Grace", "F", (20,200,200)), ("Hank", "M", (200,20,200)), ("Ivy", "F", (100,200,20))]
+        name = random.choice(names)
+        self.color = name[2]
+        return name[0]
     
     def update(self, delta_time):
         """Met à jour l'état du PNJ, gère les besoins et exécute des tâches."""

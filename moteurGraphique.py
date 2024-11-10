@@ -460,7 +460,7 @@ class Camera:
                                 )
                                 for x, y in unified_polygon.exterior.coords
                             ]
-                            pygame.draw.polygon(self.screen, (255, 255, 0, 100), screen_points, 1)
+                            pygame.draw.polygon(self.screen, entity.color, screen_points, 1)
                             
                 
                         # Afficher la zone visible par le PNJ
@@ -500,7 +500,21 @@ class Camera:
                         x, y = entity.target_location
                         t_screen_x = int((x - self.camera_center_x + self.screen_width / 2 / self.scale) * self.scale)
                         t_screen_y = int((y - self.camera_center_y + self.screen_height / 2 / self.scale) * self.scale)
-                        pygame.draw.line(self.screen, (255, 0, 0), (screen_x, screen_y), (t_screen_x, t_screen_y), 2)
+                        if entity.path:
+                            for i in range(len(entity.path) - 1):
+                                x1, y1 = entity.path[i]
+                                x2, y2 = entity.path[i + 1]
+                                p1 = (
+                                    int((x1 - self.camera_center_x + self.screen_width / 2 / self.scale) * self.scale),
+                                    int((y1 - self.camera_center_y + self.screen_height / 2 / self.scale) * self.scale)
+                                )
+                                p2 = (
+                                    int((x2 - self.camera_center_x + self.screen_width / 2 / self.scale) * self.scale),
+                                    int((y2 - self.camera_center_y + self.screen_height / 2 / self.scale) * self.scale)
+                                )
+                                pygame.draw.line(self.screen, (100, 255, 0), p1, p2, 2)
+                        else:
+                            pygame.draw.line(self.screen, (100, 255, 0), (screen_x, screen_y), (t_screen_x, t_screen_y), 2)
                         pygame.draw.circle(self.screen, (255, 0, 255), (t_screen_x, t_screen_y), 5)
                     
                     if entity.path:
