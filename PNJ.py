@@ -105,15 +105,15 @@ class PNJ(Entity):
         if not self.is_in_chunk(self.x, self.y):
             self.set_chunk_actual()
 
-    def move_to(self, target):
+    def move_to(self):
         """Déplace le PNJ vers une cible spécifique en fonction de son environnement."""
-        self.target_location = target
+        target = self.target_location
         
         if self.path:
             self.follow_path()
             return
         
-        if not self.is_at_target():
+        if target and not self.is_at_target():
             # Calculer le vecteur de direction vers la cible
             dir_x = target[0] - self.x
             dir_y = target[1] - self.y
@@ -150,10 +150,7 @@ class PNJ(Entity):
             self.calculate_velocity(target)
             
             if self.is_at_target(target):
-                print(f"{self.name} atteint le point {target}")
-                self.path.pop()
-                if not self.path:
-                    self.target_location = None
+                self.path.pop(0)
         
     def calculate_velocity(self, target):
         """Calcule le vecteur de direction vers la cible et met à jour la vitesse."""
@@ -218,7 +215,8 @@ class PNJ(Entity):
             target = self.target_location
         if not target:
             return False
-        return math.sqrt((self.x - self.target_location[0]) ** 2 + (self.y - self.target_location[1]) ** 2) < threshold + self.size / 2
+        distance = math.sqrt((self.x - target[0]) ** 2 + (self.y - target[1]) ** 2) 
+        return distance < threshold + self.size / 2
 
     def consume_water(self, delta_time):
         """Consomme de l'eau pour satisfaire la soif."""
@@ -283,8 +281,9 @@ class DrinkTask(Task):
             # Trouve la ressource en eau la plus proche
             if not self.target:
                 self.target = self.pnj.memory.get_resource('Water')
+                self.pnj.target_location = self.target
             
-            self.pnj.move_to(self.target)
+            self.pnj.move_to()
             if self.pnj.is_at_target():
                 self.pnj.consume_water(delta_time)
                 if self.pnj.needs['thirst'] >= 100:
@@ -308,7 +307,7 @@ class ExploreTask(Task):
         elif not self.pnj.target_location:
             self.pnj.target_location = self.pnj.get_random_target()
         else:
-            self.pnj.move_to(self.pnj.target_location)
+            self.pnj.move_to()
 
 class PNJMemory:
     def __init__(self, pnj):

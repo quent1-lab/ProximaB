@@ -463,7 +463,7 @@ class Camera:
                             pygame.draw.polygon(self.screen, entity.color, screen_points, 1)
                             
                 
-                        # Afficher la zone visible par le PNJ
+                    # Afficher la zone visible par le PNJ
                     if entity.vision_range > 0:
                         # Affiche le cone de vision en fonction de l'angle de vue
                         vision_polygon = entity.get_vision_polygon()
@@ -512,6 +512,10 @@ class Camera:
                                     int((x2 - self.camera_center_x + self.screen_width / 2 / self.scale) * self.scale),
                                     int((y2 - self.camera_center_y + self.screen_height / 2 / self.scale) * self.scale)
                                 )
+                                if i == 0:
+                                    pygame.draw.line(self.screen, (100, 255, 0), (screen_x, screen_y), p1, 2)
+                                elif i == len(entity.path) - 2:
+                                    pygame.draw.line(self.screen, (100, 255, 0), p2, (t_screen_x, t_screen_y), 2)
                                 pygame.draw.line(self.screen, (100, 255, 0), p1, p2, 2)
                         else:
                             pygame.draw.line(self.screen, (100, 255, 0), (screen_x, screen_y), (t_screen_x, t_screen_y), 2)
