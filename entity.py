@@ -347,7 +347,8 @@ class Animal(Entity):
     
     def update(self, delta_time):
         """Mise à jour de l'animal."""
-        self.wander(delta_time)
+        if self.is_alive:
+            self.wander(delta_time)
         
     def render(self, screen, scale, screen_x, screen_y):
         if self.is_alive:

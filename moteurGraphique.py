@@ -1,6 +1,6 @@
 import json, pygame, uuid, perlin_noise, os, json, numpy as np
 from chunk_ import Chunk
-from shapely.geometry import Polygon
+from shapely.geometry import Polygon,MultiPolygon
 from shapely.ops import unary_union
 
 # Charger la configuration depuis un fichier JSON
@@ -449,8 +449,11 @@ class Camera:
                                 (x, y + self.chunk_size)
                             ])
                             polygons.append(chunk_polygon)
+                        
                         if polygons:
-                            # Créer un polygone à partir des points
+                            if isinstance(polygons, MultiPolygon):
+                                polygons = polygons.geoms   
+                            
                             unified_polygon = unary_union(polygons)
                             # Convertir les points en coordonnées d'écran
                             screen_points = [

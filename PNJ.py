@@ -250,7 +250,7 @@ class BehaviorManager:
         if self.pnj.needs['thirst'] < 40 and self.pnj.memory.has_resource('Water'):
             print(f"{self.pnj.name} a soif !")
             return DrinkTask(self.pnj)
-        elif self.pnj.needs['hunger'] < 95:
+        elif self.pnj.needs['hunger'] < 30:
             print(f"{self.pnj.name} a faim !")
             return EatTask(self.pnj)
         else:
