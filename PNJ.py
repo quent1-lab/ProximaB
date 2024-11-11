@@ -1,7 +1,6 @@
 from entity import Entity, Pathfinding
-from shapely.geometry import Polygon, MultiPoint, Point
-from shapely.ops import unary_union
-from polygon import PolygonOptimizer
+from shapely.geometry import Polygon, Point
+from event import AttackEvent, DeathEvent, InteractionEvent
 import random, math
 
 class PNJ(Entity):
@@ -248,10 +247,10 @@ class BehaviorManager:
 
     def decide_next_task(self):
         """Décide de la prochaine tâche en fonction des besoins et de la mémoire."""
-        if self.pnj.needs['thirst'] < 90 and self.pnj.memory.has_resource('Water'):
+        if self.pnj.needs['thirst'] < 40 and self.pnj.memory.has_resource('Water'):
             print(f"{self.pnj.name} a soif !")
             return DrinkTask(self.pnj)
-        elif self.pnj.needs['hunger'] < 70 and self.pnj.memory.has_resource('Food'):
+        elif self.pnj.needs['hunger'] < 95:
             print(f"{self.pnj.name} a faim !")
             return EatTask(self.pnj)
         else:
@@ -290,14 +289,58 @@ class DrinkTask(Task):
                     self.complete = True
 
 class EatTask(Task):
+    def __init__(self, pnj):
+        super().__init__(pnj)
+        self.target = None
+        self.food = None
+        self.pnj = pnj
+        self.attack_cooldown = 0  # Temps restant avant la prochaine attaque
+        self.attack_delay = 2  # Délai entre les attaques en secondes
+    
     def execute(self, delta_time):
-        if not self.pnj.memory.has_resource('Food'):
-            self.pnj.find_food()
+        if not self.pnj.memory.has_resource('Food') and not self.target:
+            self.find_animal()
         else:
-            self.pnj.move_to(self.pnj.memory.get_resource('Food'))
-            if self.pnj.is_at_target():
+            self.attack_animal(delta_time)
+            if self.food:
                 self.pnj.consume_food(delta_time)
-                self.complete = True
+                if self.pnj.needs['hunger'] >= 100:
+                    self.complete = True
+                    self.pnj.target_location = None
+    
+    def find_animal(self):
+        """Trouve un animal à chasser pour obtenir de la nourriture."""
+        animals = self.pnj.world.entities.get("animal", [])
+        if animals:
+            # Choisir l'animal le plus proche
+            min_distance = float('inf')
+            closest_animal = None
+            for animal in animals:
+                if not animal.is_alive:
+                    continue
+                distance = math.sqrt((self.pnj.x - animal.x) ** 2 + (self.pnj.y - animal.y) ** 2)
+                if distance < min_distance:
+                    min_distance = distance
+                    closest_animal = animal
+            self.target = closest_animal
+        else:
+            self.complete = True
+    
+    def attack_animal(self, delta_time):
+        """Attaque l'animal le plus proche pour obtenir de la nourriture."""
+        if self.target:
+            distance = math.sqrt((self.pnj.x - self.target.x) ** 2 + (self.pnj.y - self.target.y) ** 2)
+            if distance < 2:
+                if self.attack_cooldown <= 0:
+                    self.pnj.event_manager.emit_event(AttackEvent(self.pnj, self.target, 10))
+                    self.attack_cooldown = self.attack_delay  # Réinitialiser le délai d'attaque
+                    if self.target.health <= 0:
+                        self.food = True
+                else:
+                    self.attack_cooldown -= delta_time  # Décrémenter le délai d'attaque
+            
+            self.pnj.target_location = (self.target.x, self.target.y)
+            self.pnj.move_to()
 
 class ExploreTask(Task):
     def execute(self, delta_time):

@@ -20,6 +20,9 @@ class Entity:
         self.in_water = False  # Indique si l'entité est dans l'eau
         
         self.color = (255, 0, 0)  # Couleur par défaut
+        self.is_attacked = False
+        self.attack_timer = 0
+        self.attack_duration = 0.5  # Durée du filtre rouge en secondes
         
         self.health = 100  # Points de vie de l'entité
         self.vision_range = 10  # Portée de vision de l'entité
@@ -71,9 +74,12 @@ class Entity:
 
     def handle_attack(self, event):
         self.health -= event.data["damage"]
-        print(f"{self.name} a été attaqué et a perdu {event.data['damage']} points de vie.")
+        # print(f"{self.name} a été attaqué et a perdu {event.data['damage']} points de vie.")
         if self.health <= 0:
             self.die()
+        else:
+            self.is_attacked = True
+            self.attack_timer = self.attack_duration
     
     def handle_death(self, event):
         print(f"{self.name} est mort.")
@@ -157,7 +163,7 @@ class Entity:
                     self.vx -= dx / distance * avoidance_factor
                     self.vy -= dy / distance * avoidance_factor
 
-    def render(self, screen, scale, screen_x, screen_y, shape='circle', **kwargs):
+    def render(self, screen, scale, screen_x, screen_y, shape='circle'):
         """Affiche graphiquement l'entité sur l'écran avec des options de personnalisation."""
         # Convertir la position en pixels en fonction de l'échelle
         size_in_pixels = int(self.size * scale)
@@ -170,10 +176,21 @@ class Entity:
         # Ajouter d'autres formes si nécessaire
         else:
             raise ValueError(f"Forme non supportée: {shape}")
+        
+        # Appliquer le filtre rouge si l'entité a été attaquée
+        if self.is_attacked:
+            red_filter = pygame.Surface((size_in_pixels, size_in_pixels), pygame.SRCALPHA)
+            red_filter.fill((255, 0, 0, 175))  # 49% de transparence
+            screen.blit(red_filter, (screen_x - size_in_pixels // 2, screen_y - size_in_pixels // 2))
 
     def update(self, delta_time):
-        """Met à jour l'entité."""
+        """ Met à jour l'entité en fonction du temps écoulé."""
         self.move(delta_time)
+        
+        if self.is_attacked:
+            self.attack_timer -= delta_time
+            if self.attack_timer <= 0:
+                self.is_attacked = False
 
     def has_moved(self):
         """Retourne True si l'entité a bougé, False sinon."""
@@ -212,10 +229,33 @@ class Animal(Entity):
         change = (random.uniform(-0.1, 0.1), random.uniform(-0.1, 0.1))
         self.direction = (self.direction[0] + change[0], self.direction[1] + change[1])
         self.normalize_direction()
+        
+        # Calculer la prochaine position
+        next_x = self.x + self.direction[0] * self.speed * delta_time
+        next_y = self.y + self.direction[1] * self.speed * delta_time
+        
+        # Vérifier si la prochaine position est de l'eau
+        if self.is_water(next_x, next_y):
+            # Inverser la direction
+            self.direction = (-self.direction[0], -self.direction[1])
+            self.normalize_direction()
+        
         self.vx, self.vy = self.direction[0] * self.speed, self.direction[1] * self.speed
         self.vx = float(self.vx)
         self.vy = float(self.vy)
         super().move(delta_time)
+
+    def is_water(self, x, y):
+        """Vérifie si la tuile à la position (x, y) est de l'eau."""
+        chunk_x = int(x // self.config['chunk_size'])
+        chunk_y = int(y // self.config['chunk_size'])
+        chunk = self.world.get_chunk(chunk_x, chunk_y)
+        local_x = int(x % self.config['chunk_size'])
+        local_y = int(y % self.config['chunk_size'])
+        if 0 <= local_x < self.config['chunk_size'] and 0 <= local_y < self.config['chunk_size']:
+            tile = chunk.tiles[local_x][local_y]
+            return tile.biome in ['Water', "Mountain"]
+        return False
         
     def move(self):
         """Logique de déplacement de l'animal."""
