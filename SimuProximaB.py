@@ -108,7 +108,56 @@ def generate_animals_in_world(world, max_animals_per_chunk=2, radius=1):
             #tile.set_entity_presence(animal)
             world.add_entity(animal)
             return
+
+class PerformanceMonitor:
+    def __init__(self):
+        self.timings = {}
+        self.thresholds = {}
+        self.display = False
+
+    def start(self, system_name):
+        """Démarre la mesure de temps pour un système spécifique."""
+        self.timings[system_name] = time.perf_counter()
+
+    def stop(self, system_name):
+        """Arrête la mesure de temps et calcule le temps écoulé."""
+        if system_name in self.timings:
+            elapsed_time = time.perf_counter() - self.timings[system_name]
+            self.timings[system_name] = elapsed_time
+            self.display_status(system_name, elapsed_time)
+            return elapsed_time
+        else:
+            raise ValueError(f"Aucune mesure démarrée pour {system_name}")
+
+    def set_threshold(self, system_name, threshold):
+        """Définit un seuil au-delà duquel le système est considéré comme ralenti."""
+        if threshold < 0:
+            raise ValueError("Le seuil doit être supérieur à 0.")
+        self.thresholds[system_name] = threshold
+
+    def is_slow(self, system_name):
+        """Vérifie si un système est au-dessus de son seuil."""
+        if system_name in self.timings and system_name in self.thresholds:
+            return self.timings[system_name] > self.thresholds[system_name]
+        return False
+
+    def set_display(self, display):
+        """Active ou désactive l'affichage de l'état des systèmes surveillés."""
+        self.display = display
     
+    def display_status(self, system_name, elapsed_time):
+        """Affiche l'état d'un système surveillé."""
+        if not self.display:
+            return
+        status = "Ralentissement détecté" if self.is_slow(system_name) else "Fonctionnement normal"
+        print(f"Système: {system_name} | Temps écoulé: {elapsed_time:.2f} s | État: {status}")
+    
+    def get_elapsed_time(self, system_name):
+        """Récupère le temps écoulé pour un système spécifique."""
+        if system_name == "all":
+            return self.timings
+        return self.timings.get(system_name, 0)
+
 # Gestion des verrous pour éviter les conflits sur les accès aux données partagées
 chunk_lock = threading.Lock()
 entity_lock = threading.Lock()
@@ -121,6 +170,7 @@ class Simulation:
         self.delta_time = 1/60
         self.is_running = True
         
+        self.monitor = PerformanceMonitor()
         self.event_manager = world.event_manager
         
     def initialize_simulation(self):
@@ -142,21 +192,31 @@ class Simulation:
     def update_entities(self):
         """Gérer la mise à jour des entités (par exemple, besoins vitaux)."""
         delta_time = 0.05
+        self.monitor.set_threshold('update_entities', delta_time * 2)
         while self.is_running:
+            self.monitor.start('update_entities')
             with entity_lock:
                 self.world.update_entities(delta_time)
             time.sleep(delta_time) # Cycle rapide pour les entités
+            elapsed_time = self.monitor.stop('update_entities')
 
     def update_chunks(self):
         """Mettre à jour les chunks (par exemple, génération de nouveaux biomes)."""
+        delta_time = 1
+        self.monitor.set_threshold('update_chunks', delta_time * 2)
         while self.is_running:
+            self.monitor.start('update_chunks')
             generate_animals_in_world(self.world)
             time.sleep(1)  # Cycle plus lent car les chunks n'ont pas besoin de mises à jour rapides
+            elapsed_time = self.monitor.stop('update_chunks')
+            print(f"Chunks mis à jour en {elapsed_time:.2f} s")
 
     def run_pygame(self):
         """Boucle principale de Pygame (doit être exécutée dans le thread principal)."""
+        self.monitor.set_threshold('MoteurGraphique', self.delta_time * 2)
         
         while self.is_running:
+            self.monitor.start('MoteurGraphique')
             # Gestion des événements Pygame
             for event in pygame.event.get():
                 if event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE):
@@ -171,6 +231,7 @@ class Simulation:
             pygame.display.flip()
             # Ajuster la vitesse de rendu (par ex., 60 FPS)
             time.sleep(self.delta_time)
+            elapsed_time = self.monitor.stop('MoteurGraphique')
 
         pygame.quit()
     
