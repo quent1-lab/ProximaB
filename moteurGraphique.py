@@ -522,7 +522,7 @@ class Camera:
                                 pygame.draw.line(self.screen, (100, 255, 0), p1, p2, 2)
                         else:
                             pygame.draw.line(self.screen, (100, 255, 0), (screen_x, screen_y), (t_screen_x, t_screen_y), 2)
-                        pygame.draw.circle(self.screen, (255, 0, 255), (t_screen_x, t_screen_y), 5)
+                        pygame.draw.circle(self.screen, (255, 0, 255), (t_screen_x, t_screen_y), self.scale // 2)
                     
                     if entity.path:
                         for i in range(len(entity.path) - 1):

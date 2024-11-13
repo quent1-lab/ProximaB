@@ -48,16 +48,31 @@ def display_entity_info(entity, camera):
     """Affiche les informations d'une entité survolée."""
     name = entity.name
     info = f"PNJ {name} - ({entity.x:.2f}, {entity.y:.2f})"
+    font = camera.font
     
     # Récupérer dynamiquement tous les attributs potentiels comme énergie, faim, soif, etc.
     for need, value in entity.needs.items():
         info += f" {need.capitalize()}: {value:.2f}"
     
     # Afficher les informations
-    font = pygame.font.Font(None, 24)
     text = font.render(info, True, (255, 255, 255))
     camera.screen.blit(text, (10, 10))
     #pygame.display.flip()
+
+def display_performance_info(monitor, camera):
+    """Affiche les informations de performance des systèmes surveillés."""
+    performance_info = monitor.get_elapsed_time("all")
+    y_offset = 10
+    x_offset = camera.screen_width - 200
+    font = camera.font
+    
+    for system_name, elapsed_time in performance_info.items():
+        fps = 1 / elapsed_time if elapsed_time > 0 else 0
+        text = f"{system_name}: {int(fps)} FPS"
+        color = (255, 0, 0) if monitor.is_slow(system_name) else (255, 255, 255)
+        text = font.render(text, True, color)
+        camera.screen.blit(text, (x_offset, y_offset))
+        y_offset += 30
 
 def generate_food_in_world(world, max_food_per_chunk=5):
     for chunk in world.loaded_chunks.values():
@@ -112,6 +127,7 @@ def generate_animals_in_world(world, max_animals_per_chunk=2, radius=1):
 class PerformanceMonitor:
     def __init__(self):
         self.timings = {}
+        self.update_timings = {}
         self.thresholds = {}
         self.display = False
 
@@ -123,7 +139,7 @@ class PerformanceMonitor:
         """Arrête la mesure de temps et calcule le temps écoulé."""
         if system_name in self.timings:
             elapsed_time = time.perf_counter() - self.timings[system_name]
-            self.timings[system_name] = elapsed_time
+            self.update_timings[system_name] = elapsed_time
             self.display_status(system_name, elapsed_time)
             return elapsed_time
         else:
@@ -137,8 +153,8 @@ class PerformanceMonitor:
 
     def is_slow(self, system_name):
         """Vérifie si un système est au-dessus de son seuil."""
-        if system_name in self.timings and system_name in self.thresholds:
-            return self.timings[system_name] > self.thresholds[system_name]
+        if system_name in self.update_timings and system_name in self.thresholds:
+            return self.update_timings[system_name] > self.thresholds[system_name]
         return False
 
     def set_display(self, display):
@@ -155,8 +171,8 @@ class PerformanceMonitor:
     def get_elapsed_time(self, system_name):
         """Récupère le temps écoulé pour un système spécifique."""
         if system_name == "all":
-            return self.timings
-        return self.timings.get(system_name, 0)
+            return self.update_timings
+        return self.update_timings.get(system_name, 0)
 
 # Gestion des verrous pour éviter les conflits sur les accès aux données partagées
 chunk_lock = threading.Lock()
@@ -209,7 +225,6 @@ class Simulation:
             generate_animals_in_world(self.world)
             time.sleep(1)  # Cycle plus lent car les chunks n'ont pas besoin de mises à jour rapides
             elapsed_time = self.monitor.stop('update_chunks')
-            print(f"Chunks mis à jour en {elapsed_time:.2f} s")
 
     def run_pygame(self):
         """Boucle principale de Pygame (doit être exécutée dans le thread principal)."""
@@ -227,6 +242,9 @@ class Simulation:
             
             # Gérer le survol des entités par la souris
             handle_entity_hover_and_click(self.world, self.camera)
+            
+            # Afficher les informations de performance
+            display_performance_info(self.monitor, self.camera)
             
             pygame.display.flip()
             # Ajuster la vitesse de rendu (par ex., 60 FPS)
