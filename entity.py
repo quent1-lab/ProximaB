@@ -32,7 +32,7 @@ class Entity:
         self.event_manager = world.event_manager
         
         self.storage_inventory = Inventory(storage_capacity)  # Pour les objets stockés
-        self.resource_inventory = Inventory(float('inf'))     # Pour les ressources propres de l'entité
+        self.resource_inventory = Inventory(10)     # Pour les ressources propres de l'entité
         for resource in resources:
             self.resource_inventory.add_item(resource)
         self.holding_item = None
@@ -44,6 +44,23 @@ class Entity:
                 chunk.add_dropped_item(DroppedItem(dropped_item, (self.x, self.y)))
                 return dropped_item
         return None
+    
+    def drop_all_items(self, chunk):
+        # Créer une copie des éléments du dictionnaire pour éviter les modifications pendant l'itération
+        storage_items_copy = list(self.storage_inventory.items.items())
+        resource_items_copy = list(self.resource_inventory.items.items())
+
+        for item_name, item in storage_items_copy:
+            dropped_item = self.storage_inventory.remove_item(item_name, item.quantity)
+            chunk.add_dropped_item(DroppedItem(item, (self.x, self.y)))
+        
+        for item_name, item in resource_items_copy:
+            dropped_item = self.resource_inventory.remove_item(item_name, item.quantity)
+            chunk.add_dropped_item(DroppedItem(item, (self.x, self.y)))
+            print(f"{self.name} a laissé tomber {item.quantity} {item_name}.")
+        
+        self.storage_inventory.items = {}
+        self.resource_inventory.items = {}
 
     def pick_up_item(self, chunk, item_name, quantity=1):
         dropped_item = chunk.remove_dropped_item(item_name, quantity)
@@ -223,6 +240,10 @@ class Animal(Entity):
         self.intelligence = 0.5  # Niveau d'intelligence de l'animal (peut influencer ses décisions)
         self.direction = (random.uniform(-1, 1), random.uniform(-1, 1))
         self.normalize_direction()
+        
+        # Ajoute les items de base à l'inventaire des ressources
+        self.resource_inventory.add_item(self.resource_inventory.create_item("Leather", 2))
+        self.resource_inventory.add_item(self.resource_inventory.create_item("Meat", 3))
 
     def wander(self, delta_time):
         """Déplacement aléatoire pour les animaux avec des mouvements plus réalistes."""
@@ -290,6 +311,10 @@ class Animal(Entity):
         self.is_alive = False
         # Logique pour enlever l'animal du monde
         print(f"{self.name} est mort.")
+        
+        # Dropper les ressources de l'animal
+        self.drop_all_items(self.world.get_chunk(int(self.x // self.config['chunk_size']), int(self.y // self.config['chunk_size'])))
+        
         # Supprimer l'animal du monde
         # self.world.remove_entity(self)
     

@@ -16,6 +16,11 @@ class Item:
             pygame.draw.circle(screen, color, (screen_x, screen_y), size_in_pixels // 2)
         elif shape == 'square':
             pygame.draw.rect(screen, color, (screen_x - size_in_pixels // 2, screen_y - size_in_pixels // 2, size_in_pixels, size_in_pixels))
+        elif shape == 'triangle':
+            point1 = (screen_x, screen_y - size_in_pixels // 2)
+            point2 = (screen_x - size_in_pixels // 2, screen_y + size_in_pixels // 2)
+            point3 = (screen_x + size_in_pixels // 2, screen_y + size_in_pixels // 2)
+            pygame.draw.polygon(screen, color, [point1, point2, point3])
         # Ajouter d'autres formes si nécessaire
         else:
             raise ValueError(f"Forme non supportée: {shape}")
@@ -42,6 +47,9 @@ class Inventory:
             self.items[item.name].quantity += item.quantity
         else:
             self.items[item.name] = item
+    
+    def create_item(self, item_name, quantity=1):
+        return Item(item_name, quantity=quantity)
 
     def remove_item(self, item_name, quantity=1):
         if item_name in self.items:
