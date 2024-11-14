@@ -124,6 +124,26 @@ def generate_animals_in_world(world, max_animals_per_chunk=2, radius=1):
             world.add_entity(animal)
             return
 
+class SimulationClock:
+    def __init__(self, time_factor=1.0):
+        """
+        Initialisez l'horloge de simulation.
+        :param time_factor: Facteur de temps permettant d'accélérer ou de ralentir la simulation.
+        """
+        self.time_factor = time_factor
+        self.elapsed_time = 0.0  # Temps total écoulé dans la simulation
+
+    def update(self, real_delta_time):
+        """
+        Met à jour l'horloge en fonction du temps réel et du facteur de temps.
+        :param real_delta_time: Temps écoulé dans le monde réel.
+        """
+        self.elapsed_time += real_delta_time * self.time_factor
+
+    def get_simulation_time(self):
+        """Retourne le temps total écoulé dans la simulation."""
+        return self.elapsed_time
+
 class PerformanceMonitor:
     def __init__(self):
         self.timings = {}
