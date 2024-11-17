@@ -6,10 +6,10 @@ class Item:
         self.weight = weight
         self.quantity = quantity
     
-    def render(self, screen, screen_x, screen_y, scale = 0.5, color=(100, 0, 100), shape='circle', **kwargs):
+    def render(self, screen, screen_x, screen_y, scale = 0.5, color=(100, 20, 150), shape='circle', **kwargs):
         """Affiche graphiquement l'item sur l'écran avec des options de personnalisation."""
         # Convertir la position en pixels en fonction de l'échelle
-        size_in_pixels = int(scale * 5)
+        size_in_pixels = int(scale * 0.5)
 
         # Dessiner l'entité en fonction de la forme spécifiée
         if shape == 'circle':

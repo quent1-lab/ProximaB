@@ -419,10 +419,10 @@ class Camera:
         for dropped_items in items:
             for dropped_item in dropped_items:
                 # Affichage en fonction de la position dans le monde et de la position de la caméra
-                screen_x = dropped_item.position[0] - self.camera_center_x
-                screen_y = dropped_item.position[1] - self.camera_center_y
+                screen_x = int((dropped_item.position[0] - self.camera_center_x + self.screen_width / 2 / self.scale) * self.scale)
+                screen_y = int((dropped_item.position[1] - self.camera_center_y + self.screen_height / 2 / self.scale) * self.scale)
                 # Remplacer par un affichage de sprite ou autre représentation visuelle
-                dropped_item.item.render(self.screen, screen_x, screen_y)
+                dropped_item.item.render(self.screen, screen_x, screen_y, scale=self.scale)
         
         # Afficher les PNJ
         for entity_list in self.world.entities.values():
@@ -537,7 +537,7 @@ class Camera:
                                 int((y2 - self.camera_center_y + self.screen_height / 2 / self.scale) * self.scale)
                             )
                             pygame.draw.line(self.screen, (100, 255, 0), p1, p2, 2)
-                
+        
         # Ecriture du nombre de chunks chargés
         text = self.font.render(f"Chunks loaded: {len(self.world.loaded_chunks)}", True, (255, 255, 255))
         self.screen.blit(text, (10, 40))
