@@ -453,17 +453,34 @@ class Camera:
                         if polygons:
                             if isinstance(polygons, MultiPolygon):
                                 polygons = polygons.geoms   
-                            
+
                             unified_polygon = unary_union(polygons)
-                            # Convertir les points en coordonnées d'écran
-                            screen_points = [
-                                (
-                                    int((x - self.camera_center_x + self.screen_width / 2 / self.scale) * self.scale),
-                                    int((y - self.camera_center_y + self.screen_height / 2 / self.scale) * self.scale)
-                                )
-                                for x, y in unified_polygon.exterior.coords
-                            ]
-                            pygame.draw.polygon(self.screen, entity.color, screen_points, 1)
+                            
+                            # Vérifier si le résultat est un Polygon ou un MultiPolygon
+                            if isinstance(unified_polygon, Polygon):
+                                # Convertir les points en coordonnées d'écran
+                                screen_points = [
+                                    (
+                                        int((x - self.camera_center_x + self.screen_width / 2 / self.scale) * self.scale),
+                                        int((y - self.camera_center_y + self.screen_height / 2 / self.scale) * self.scale)
+                                    )
+                                    for x, y in unified_polygon.exterior.coords
+                                ]
+                                pygame.draw.polygon(self.screen, entity.color, screen_points, 1)
+
+                            elif isinstance(unified_polygon, MultiPolygon):
+                                for polygon in unified_polygon.geoms:
+                                    screen_points = [
+                                        (
+                                            int((x - self.camera_center_x + self.screen_width / 2 / self.scale) * self.scale),
+                                            int((y - self.camera_center_y + self.screen_height / 2 / self.scale) * self.scale)
+                                        )
+                                        for x, y in polygon.exterior.coords
+                                    ]
+                                    pygame.draw.polygon(self.screen, entity.color, screen_points, 1)
+
+                            else:
+                                print("Aucun polygone valide pour l'entité.")
                             
                 
                     # Afficher la zone visible par le PNJ
